@@ -1,0 +1,1669 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Interactive, offline, step-by-step visualizer that counts the 1 bits and 0 bits of the 8086 AX register by shift-and-count, with 8086 assembly programs.">
+<title>Count 1s and 0s in AX: Bit Count Visualizer</title>
+<style>
+  :root {
+    --bg: #f6f5f1;
+    --surface: #ffffff;
+    --surface-2: #f0efe9;
+    --ink: #1c1b19;
+    --ink-2: #57544d;
+    --ink-3: #8a867c;
+    --line: #e2dfd6;
+    --accent: #3b4fd8;
+    --accent-soft: #e6e9fc;
+    --pair: #c2410c;
+    --pair-soft: #ffedd5;
+    --sub: #b42318;
+    --sub-soft: #fde8e6;
+    --add: #18794e;
+    --add-soft: #e3f5ea;
+    --nop: #6b6860;
+    --nop-soft: #efeee9;
+    --asr: #1d5fa8;
+    --asr-soft: #e3eefa;
+    --dir: #7c3aad;
+    --err: #b42318;
+    --shadow: 0 1px 2px rgba(28, 27, 25, .06), 0 4px 16px rgba(28, 27, 25, .05);
+    --radius: 14px;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace;
+  }
+  :root[data-theme="dark"] {
+    --bg: #121316;
+    --surface: #1b1d22;
+    --surface-2: #24272e;
+    --ink: #ecebe6;
+    --ink-2: #b3b0a7;
+    --ink-3: #85827a;
+    --line: #30333b;
+    --accent: #8c9bff;
+    --accent-soft: #262c52;
+    --pair: #ff9a5c;
+    --pair-soft: #3d2618;
+    --sub: #ff7b72;
+    --sub-soft: #3d1d1b;
+    --add: #4fd18b;
+    --add-soft: #16352a;
+    --nop: #a8a59c;
+    --nop-soft: #2a2c31;
+    --asr: #6cb0ff;
+    --asr-soft: #172b45;
+    --dir: #d2a8ff;
+    --err: #ff7b72;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4);
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.55 var(--sans);
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+  header.top { padding: 28px 0 8px; }
+  header.top .wrap { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+  h1 { margin: 0; font-size: clamp(1.35rem, 3.2vw, 2rem); letter-spacing: -.02em; line-height: 1.2; }
+  .sub { margin: 6px 0 0; color: var(--ink-2); }
+  h2 { font-size: 1.05rem; margin: 0 0 14px; letter-spacing: -.01em; }
+  h3 { font-size: 1rem; margin: 22px 0 8px; }
+  a { color: var(--accent); }
+
+  /* ---------- page nav (shared by index.html and bitcount.html) ---------- */
+  nav.pagenav { background: var(--surface); border-bottom: 1px solid var(--line); }
+  nav.pagenav .wrap { display: flex; gap: 6px; padding-top: 8px; padding-bottom: 8px; overflow-x: auto; scrollbar-width: none; }
+  nav.pagenav a {
+    font: 600 .9rem var(--sans); color: var(--ink-2); text-decoration: none; white-space: nowrap;
+    padding: 7px 14px; border-radius: 999px; border: 1.5px solid transparent;
+  }
+  nav.pagenav a:hover { border-color: var(--line); color: var(--ink); }
+  nav.pagenav a[aria-current="page"] { background: var(--accent-soft); color: var(--accent); }
+  nav.pagenav a:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  nav.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin: 18px 0 22px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+  nav.tabs button {
+    appearance: none; border: 0; background: none; cursor: pointer;
+    font: 600 .95rem var(--sans); color: var(--ink-2);
+    padding: 10px 14px; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap;
+  }
+  nav.tabs button[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+  nav.tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 6px; }
+
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px 22px; margin-bottom: 18px; }
+  .muted { color: var(--ink-2); }
+  .mono { font-family: var(--mono); }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* ---------- inputs ---------- */
+  .inputs { display: grid; grid-template-columns: 1fr 1fr .9fr 1.2fr; gap: 18px 22px; align-items: start; }
+  .field { margin: 0; padding: 0; border: 0; min-width: 0; }
+  .field > label, .field > legend { display: block; font-weight: 600; font-size: .9rem; margin-bottom: 6px; padding: 0; }
+  .numrow { position: relative; display: flex; }
+  input.num {
+    width: 100%; min-width: 0; font: 600 1.35rem var(--mono); color: var(--ink); text-transform: uppercase;
+    background: var(--surface); border: 1.5px solid var(--line); border-radius: 10px; padding: 9px 52px 9px 12px;
+  }
+  input.num:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  input.num[aria-invalid="true"] { border-color: var(--err); box-shadow: 0 0 0 3px var(--sub-soft); }
+  .unit { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font: 700 .78rem var(--mono); color: var(--ink-3); background: var(--surface-2); border-radius: 6px; padding: 2px 6px; pointer-events: none; }
+  .err { color: var(--err); font-size: .85rem; margin: 6px 0 0; min-height: 1.3em; }
+  .hint { color: var(--ink-3); font-size: .85rem; margin: 6px 0 0; }
+  .seg { display: flex; background: var(--surface-2); border: 1.5px solid var(--line); border-radius: 10px; padding: 3px; }
+  .seg label { flex: 1; cursor: pointer; }
+  .seg input { position: absolute; opacity: 0; pointer-events: none; }
+  .seg span { display: block; text-align: center; padding: 8px 6px; border-radius: 7px; font-weight: 600; color: var(--ink-2); white-space: nowrap; }
+  .seg input:checked + span { background: var(--surface); color: var(--accent); box-shadow: var(--shadow); }
+  .seg input:focus-visible + span { outline: 2px solid var(--accent); }
+
+  #sim-body.invalid > .card:not(.invalid-msg) { opacity: .35; pointer-events: none; filter: grayscale(.6); }
+  .invalid-msg { color: var(--err); font-weight: 600; }
+
+  /* ---------- bits ----------
+     Boxes are grouped into nibbles, and nibbles into 16-bit words. The box size
+     comes from the width of the surrounding .sized container (cqw units), so a
+     32-bit register fits on one line on a laptop and wraps per 16-bit word on a phone. */
+  .sized { container-type: inline-size; }
+  .bits { --lab: 0px; }
+  .setup .bits { --lab: 44px; }
+  .regs .bits { --lab: 150px; }
+  .bits { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; --bf: calc(var(--bw) * .6); }
+  .word, .nib { display: inline-flex; }
+  .word { gap: 6px; }
+  .nib { gap: 2px; }
+  .w4 .bits  { --bw: clamp(28px, calc((100cqw - var(--lab) - 20px) / 8), 56px); }
+  .w8 .bits  { --bw: clamp(13px, calc((100cqw - var(--lab) - 42px) / 16), 46px); }
+  .w16 .bits { --bw: clamp(14px, calc((100cqw - var(--lab) - 96px) / 32), 34px); }
+  @container (max-width: 620px) {
+    .regs .bits { --lab: 0px; }
+    .w16 .bits { --bw: clamp(12px, calc((100cqw - var(--lab) - 42px) / 16), 30px); }
+  }
+  .bit {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: var(--bw); height: calc(var(--bw) * 1.18);
+    font: 700 var(--bf) var(--mono); border-radius: calc(var(--bw) * .2);
+    background: var(--surface-2); border: 1.5px solid var(--line); color: var(--ink);
+  }
+  .bit.pair { background: var(--pair-soft); border-color: var(--pair); color: var(--pair); }
+  .bit.changed { animation: flash .7s ease-out; }
+  @keyframes flash { from { background: var(--accent-soft); border-color: var(--accent); transform: translateY(-3px); } }
+  @media (prefers-reduced-motion: reduce) { .bit.changed { animation: none; } }
+
+  /* ---------- registers ---------- */
+  .cardhead { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .stepinfo { font: 600 .9rem var(--mono); color: var(--ink-2); }
+  .regs { display: grid; grid-template-columns: 8.5rem 1fr; gap: 14px; align-items: center; padding: 6px 0 4px; }
+  .reg { display: contents; }
+  .reg .lbl { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
+  .reg .lbl b { font: 700 1.25rem var(--mono); }
+  .reg .lbl small { color: var(--ink-3); font-size: .8rem; }
+  .reg .lbl .val { font: 600 .9rem var(--mono); color: var(--ink-2); overflow-wrap: anywhere; }
+  .reg .rbits { display: flex; justify-content: flex-end; min-width: 0; }
+  .reg.adding .bit { border-color: var(--add); }
+  .reg.skipping .bits { opacity: .45; }
+  .reg.count .rbits { font: 700 1.6rem var(--mono); }
+  @container (max-width: 620px) {
+    .regs { grid-template-columns: 1fr; gap: 4px; }
+    .reg .lbl { flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; margin-top: 8px; }
+  }
+  .opline { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 16px 0 0; font-size: 1.02rem; min-height: 2.2em; }
+  .badge { font: 700 .9rem var(--mono); padding: 5px 11px; border-radius: 999px; white-space: nowrap; background: var(--nop-soft); color: var(--nop); }
+  .k-add .badge, .badge.k-add { background: var(--add-soft); color: var(--add); }
+  .k-shift .badge, .badge.k-shift { background: var(--asr-soft); color: var(--asr); }
+  .k-init .badge, .badge.k-init { background: var(--accent-soft); color: var(--accent); }
+
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+  .controls button, .presets button {
+    font: 600 .95rem var(--sans); cursor: pointer; color: var(--ink);
+    background: var(--surface); border: 1.5px solid var(--line); border-radius: 10px; padding: 10px 16px;
+  }
+  .controls button:hover:not(:disabled), .presets button:hover { border-color: var(--ink-3); }
+  .controls button:disabled { opacity: .4; cursor: default; }
+  .controls button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  [data-theme="dark"] .controls button.primary { color: #10131f; }
+
+  .presets { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
+  .presets .plabel { font-weight: 600; font-size: .9rem; color: var(--ink-2); margin-right: 4px; }
+  .presets button { padding: 7px 12px; font: 600 .95rem var(--mono); }
+  .presets button.edge { border-color: var(--pair); color: var(--pair); background: var(--pair-soft); }
+  .presets button.asm { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+  #btn-play[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--surface); }
+  .kbd-hint { align-self: center; margin-left: auto; font-size: .8rem; color: var(--ink-3); }
+
+  /* ---------- table ---------- */
+  .tablewrap { overflow-x: auto; margin: 0 -22px; padding: 0 22px; }
+  table.steps { border-collapse: collapse; width: 100%; min-width: 560px; }
+  .steps th { text-align: left; font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3); font-weight: 700; padding: 8px 10px; border-bottom: 1.5px solid var(--line); white-space: nowrap; }
+  .steps th sub, .steps th small { text-transform: none; }
+  .steps td { padding: 9px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  .steps td.b { font: 600 1.15rem var(--mono); letter-spacing: .06em; }
+  .w16 .steps td.b { font-size: .8rem; letter-spacing: 0; white-space: normal; line-height: 1.35; }
+  .w16 .opname .long { display: none; }
+  .w16 .opname .short { display: inline; }
+  .w16 .steps th, .w16 .steps td { padding-left: 7px; padding-right: 7px; }
+  .steps td.b .x { color: var(--ink-3); }
+  .steps td.b .tw { display: inline-block; white-space: nowrap; }
+  .steps td.step { font-weight: 700; }
+  .steps td.op { font-size: .95rem; }
+  .steps tr.k-shift td { border-bottom-width: 2px; }
+  .steps tbody tr { cursor: pointer; }
+  .steps tbody tr:hover td { background: var(--surface-2); }
+  .steps tr.current td { background: var(--accent-soft) !important; }
+  .steps tr.current td:first-child { box-shadow: inset 4px 0 0 var(--accent); }
+  .opname { font-weight: 600; }
+  .opname .short { display: none; text-decoration: none; }
+  .k-add .opname { color: var(--add); }
+  .k-shift .opname { color: var(--asr); }
+  .k-skip .opname { color: var(--nop); }
+
+  /* ---------- result ---------- */
+  .result-bits { font: 700 clamp(1.3rem, 3.6vw, 2.3rem) var(--mono); letter-spacing: .06em; color: var(--accent); overflow-wrap: anywhere; }
+  .w16 .result-bits { font-size: clamp(1.05rem, 2.4vw, 1.7rem); }
+  .result-dec { font: 700 clamp(1.2rem, 3.2vw, 1.8rem) var(--mono); margin: 6px 0 0; overflow-wrap: anywhere; }
+  .result-dec .muted { font-weight: 600; }
+  .check { margin: 12px 0 0; font: 600 1.1rem var(--mono); padding: 10px 14px; border-radius: 10px; display: inline-block; overflow-wrap: anywhere; }
+  .check.ok { background: var(--add-soft); color: var(--add); }
+  .check.bad { background: var(--sub-soft); color: var(--sub); }
+  .check small { display: block; font-weight: 500; font-size: .85em; opacity: .9; }
+
+  /* ---------- explanation tabs ---------- */
+  .prose p, .prose li { max-width: 72ch; }
+  .prose ul { padding-left: 1.2em; }
+  .prose li { margin: 4px 0; }
+  table.mini { border-collapse: collapse; margin: 10px 0 14px; font-size: .95rem; }
+  .mini th, .mini td { text-align: left; padding: 7px 14px 7px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .mini th { font-size: .8rem; color: var(--ink-3); text-transform: uppercase; letter-spacing: .05em; }
+  .mini th sub { text-transform: none; }
+  .add-c { color: var(--add); font-weight: 700; }
+  .sub-c { color: var(--sub); font-weight: 700; }
+  .live { padding: 12px 14px; border-radius: 10px; background: var(--accent-soft); }
+  svg.flow { display: block; width: 100%; max-width: 640px; height: auto; margin: 0 auto; }
+  .flow .n { fill: var(--surface); stroke: var(--ink-2); stroke-width: 1.6; }
+  .flow .term { fill: var(--accent-soft); stroke: var(--accent); }
+  .flow .dec { fill: var(--pair-soft); stroke: var(--pair); }
+  .flow .addn { fill: var(--add-soft); stroke: var(--add); }
+  .flow .asrn { fill: var(--asr-soft); stroke: var(--asr); }
+  .flow text { font: 600 17px var(--sans); fill: var(--ink); text-anchor: middle; }
+  .flow text.small { font-size: 14px; font-weight: 500; fill: var(--ink-2); }
+  .flow text.lbl { font: 700 16px var(--mono); fill: var(--pair); }
+  .flow text[text-anchor="start"] { text-anchor: start; }
+  .flow .e { fill: none; stroke: var(--ink-2); stroke-width: 1.8; }
+  .flow .ah { fill: var(--ink-2); }
+
+  /* ---------- assembly tab ---------- */
+  .codehead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+  .codehead .seg { flex: 0 1 auto; }
+  .codehead .seg span { padding: 7px 12px; font-size: .9rem; }
+  .codebtns { display: flex; gap: 8px; flex-wrap: wrap; }
+  #btn-copy, .btnlink, .linkbtn {
+    font: 600 .9rem var(--sans); cursor: pointer; color: var(--ink); text-decoration: none;
+    background: var(--surface); border: 1.5px solid var(--line); border-radius: 10px; padding: 8px 14px; display: inline-block;
+  }
+  #btn-copy:hover, .btnlink:hover, .linkbtn:hover { border-color: var(--ink-3); }
+  #btn-copy.done { border-color: var(--add); color: var(--add); }
+  .linkbtn { color: var(--accent); }
+  pre.code {
+    margin: 0; padding: 14px 16px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px;
+    font: 500 .86rem/1.5 var(--mono); overflow: auto; max-height: 560px; tab-size: 8; color: var(--ink);
+  }
+  pre.code.out { max-height: none; font-size: .95rem; }
+  .t-com { color: var(--ink-3); font-style: italic; }
+  .t-ins { color: var(--accent); font-weight: 700; }
+  .t-reg { color: var(--pair); font-weight: 600; }
+  .t-num { color: var(--add); }
+  .t-str { color: var(--asr); }
+  .t-dir { color: var(--dir); font-weight: 600; }
+  .t-lbl { font-weight: 700; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
+  .map td.mono { white-space: nowrap; font-size: .9rem; }
+
+  /* ---------- theme toggle ---------- */
+  .theme {
+    flex: none; font: 600 .9rem var(--sans); cursor: pointer; color: var(--ink);
+    background: var(--surface); border: 1.5px solid var(--line); border-radius: 999px; padding: 8px 14px; white-space: nowrap;
+  }
+  .theme:hover { border-color: var(--ink-3); }
+
+  /* ---------- responsive ---------- */
+  @media (max-width: 860px) {
+    .inputs { grid-template-columns: 1fr 1fr; }
+    .kbd-hint { display: none; }
+  }
+  @media (max-width: 560px) {
+    .inputs { grid-template-columns: 1fr; gap: 10px; }
+    .tablewrap { margin: 0 -16px; padding: 0 16px; }
+    table.steps { min-width: 0; }
+    .steps th, .steps td, .w16 .steps th, .w16 .steps td { padding: 8px 3px; }
+    .steps th { font-size: .7rem; letter-spacing: 0; }
+    .steps td.b { letter-spacing: 0; font-size: .92rem; }
+    .w8 .steps td.b { font-size: .8rem; }
+    .w16 .steps td.b { font-size: .72rem; white-space: normal; line-height: 1.3; }
+    .steps td.op, .steps td.step { white-space: normal; font-size: .85rem; line-height: 1.25; }
+    .opname .long { display: none; }
+    .opname .short { display: inline; }
+    .controls button { flex: 1 1 auto; padding: 10px 12px; }
+    #btn-next { flex-basis: 100%; order: -1; }
+    .lmwrap { margin: 0 -16px; padding: 0 16px 4px; }
+    .codehead .seg { width: 100%; }
+    .codehead .seg span { white-space: normal; font-size: .82rem; line-height: 1.25; }
+    pre.code { font-size: .74rem; padding: 10px 12px; }
+    table.lm { font-size: 1.15rem; }
+    .w8 table.lm { font-size: .85rem; }
+    .w16 table.lm { font-size: .62rem; }
+    .lm td.note { font-size: .78rem; }
+    body { font-size: 15px; }
+    .wrap { padding: 0 16px; }
+    header.top { padding-top: 18px; }
+    .sub { font-size: .9rem; }
+    .card { padding: 16px; border-radius: 12px; }
+    .theme { padding: 7px 11px; }
+    .theme .tlabel { display: none; }
+  }
+
+  footer { border-top: 1px solid var(--line); margin-top: 36px; padding: 22px 0 34px; color: var(--ink-2); font-size: .92rem; }
+  footer ul { list-style: none; padding: 0; margin: 8px 0 0; display: flex; flex-wrap: wrap; gap: 8px 28px; }
+  footer li span { font-family: var(--mono); color: var(--ink-3); margin-left: 6px; }
+
+  /* ---------- Q16: AX register, CF and counters ---------- */
+  .inputs { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); max-width: 640px; }
+  .bc .axrow { --bw: clamp(14px, calc((100cqw - 300px) / 17), 40px); --bf: calc(var(--bw) * .6); align-items: flex-end; gap: 8px; }
+  .bc .axrow .bits { flex-wrap: nowrap; }
+  @container (max-width: 620px) {
+    .bc .axrow { --bw: clamp(11px, calc((100cqw - 54px) / 17), 30px); gap: 5px; justify-content: flex-start; }
+    .bc .axrow .bits, .bc .axrow .word { gap: 4px; }
+    .bc .axrow .nib { gap: 1px; }
+    .bc .reg .rbits.savedax { justify-content: flex-start; }
+  }
+  .arrow { font: 700 calc(var(--bw) * .7) var(--mono); color: var(--ink-3); align-self: center; padding-top: 1em; }
+  .cfwrap { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; }
+  .cfwrap small { font: 700 .75rem var(--mono); color: var(--ink-3); line-height: 1; }
+  .bit.cf.none { border-style: dashed; color: var(--ink-3); }
+  .bit.cf.one { background: var(--add-soft); border-color: var(--add); color: var(--add); }
+  .bit.cf.zero { background: var(--asr-soft); border-color: var(--asr); color: var(--asr); }
+  .bit.slide { animation: bitslide .45s ease-out; }
+  .bit.enter { animation: bitenter .45s ease-out; }
+  .bit.cf.drop { animation: cfdrop .5s ease-out; }
+  @keyframes bitslide { from { transform: translateX(calc(-1 * var(--bw) - 2px)); } }
+  @keyframes bitenter { from { opacity: 0; } }
+  @keyframes cfdrop { from { transform: translateX(calc(-1 * var(--bw) - 30px)); opacity: .25; } }
+  .savedax { align-items: baseline; gap: 12px; flex-wrap: wrap; font: 700 1.25rem var(--mono); }
+  .savedax small { font: 500 .85rem var(--mono); color: var(--ink-2); }
+  .counters, .resnums { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
+  .resnums { grid-template-columns: repeat(2, minmax(0, 220px)); margin: 12px 0 4px; }
+  .ctr { display: flex; flex-direction: column; align-items: center; padding: 10px 8px 12px; border-radius: 12px; background: var(--surface-2); border: 1.5px solid var(--line); line-height: 1.2; }
+  .ctr small { font: 700 .8rem var(--mono); letter-spacing: .06em; color: var(--ink-2); }
+  .ctr b { font: 700 clamp(2rem, 7vw, 3.2rem)/1.1 var(--mono); }
+  .ctr span { font-size: .8rem; color: var(--ink-3); text-align: center; }
+  .ctr.ones { background: var(--add-soft); border-color: var(--add); }
+  .ctr.ones b, .ctr.ones small { color: var(--add); }
+  .ctr.zeros { background: var(--asr-soft); border-color: var(--asr); }
+  .ctr.zeros b, .ctr.zeros small { color: var(--asr); }
+  .ctr.tick b { animation: tick .5s ease-out; }
+  @keyframes tick { from { transform: scale(1.5); } }
+  @media (prefers-reduced-motion: reduce) { .bit.slide, .bit.enter, .bit.cf.drop, .ctr.tick b { animation: none; } }
+  .inv { margin: 12px 0 0; font-size: .95rem; color: var(--ink-2); }
+  .inv b { color: var(--ink); }
+  .k-one .badge { background: var(--add-soft); color: var(--add); }
+  .k-zero .badge { background: var(--asr-soft); color: var(--asr); }
+  .k-one .opname { color: var(--add); }
+  .k-zero .opname { color: var(--asr); }
+  .zero-c { color: var(--asr); font-weight: 700; }
+  .bc .steps td.b { font-size: 1.05rem; }
+  .bc .steps td.b .tw { white-space: nowrap; }
+  @media (max-width: 560px) {
+    .bc .steps td.b { font-size: .58rem; letter-spacing: 0; }
+    .bc .steps td.op, .bc .steps td.step { white-space: nowrap; font-size: .68rem; }
+    .bc .steps th { font-size: .58rem; }
+    .bc .steps th, .bc .steps td { padding-left: 2px; padding-right: 2px; }
+    .bc .steps th small { display: none; }
+    .counters { gap: 8px; }
+    .ctr span { font-size: .72rem; }
+  }
+</style>
+</head>
+<body>
+<nav class="pagenav" aria-label="Lab problems">
+  <div class="wrap">
+    <a href="index.html">Q15 Shift-and-Add Multiply</a>
+    <a href="bitcount.html" aria-current="page">Q16 Count 1s and 0s in AX</a>
+  </div>
+</nav>
+
+<header class="top">
+  <div class="wrap">
+    <div>
+      <h1>Count 1s and 0s in AX: Bit Count Visualizer</h1>
+      <p class="sub">Computer Organization &amp; Architecture &middot; shift-and-count on the 8086 AX register, one bit at a time</p>
+    </div>
+    <button type="button" class="theme" id="theme-btn" aria-pressed="false" title="Toggle dark mode"></button>
+  </div>
+</header>
+
+<div class="wrap">
+  <nav class="tabs" role="tablist" aria-label="Sections">
+    <button role="tab" id="tab-sim" aria-controls="panel-sim" aria-selected="true">Simulator</button>
+    <button role="tab" id="tab-how" aria-controls="panel-how" aria-selected="false" tabindex="-1">How it works</button>
+    <button role="tab" id="tab-asm" aria-controls="panel-asm" aria-selected="false" tabindex="-1">8086 Assembly</button>
+    <button role="tab" id="tab-other" aria-controls="panel-other" aria-selected="false" tabindex="-1">Other methods</button>
+  </nav>
+
+  <main>
+    <section id="panel-sim" role="tabpanel" aria-labelledby="tab-sim">
+      <div class="card">
+        <h2>Input</h2>
+        <form id="inputs" class="inputs" novalidate autocomplete="off">
+          <div class="field">
+            <label for="in-v">Value loaded into <span class="mono">AX</span></label>
+            <div class="numrow">
+              <input id="in-v" class="num" type="text" spellcheck="false" autocapitalize="characters" value="1234" aria-describedby="err-v">
+              <span class="unit" aria-hidden="true">hex</span>
+            </div>
+            <p class="err" id="err-v" aria-live="polite"></p>
+          </div>
+          <fieldset class="field">
+            <legend>Number base</legend>
+            <div class="seg" role="radiogroup">
+              <label><input type="radio" name="base" value="hex" checked><span>Hex</span></label>
+              <label><input type="radio" name="base" value="dec"><span>Decimal</span></label>
+            </div>
+            <p class="hint">16 bits: 0 to 65535 (0000H to FFFFH)</p>
+          </fieldset>
+        </form>
+        <div class="presets" id="presets">
+          <span class="plabel">Examples</span>
+          <button type="button" data-v="0000" title="All zeros: ZEROS = 16">0000H</button>
+          <button type="button" data-v="FFFF" class="edge" title="All ones: ONES = 16">FFFFH</button>
+          <button type="button" data-v="AAAA" title="Alternating bits: 8 and 8">AAAAH</button>
+          <button type="button" data-v="8001" title="Only the two edge bits are 1">8001H</button>
+          <button type="button" data-v="00FF" title="Low byte all ones">00FFH</button>
+          <button type="button" data-v="1234" class="asm" title="The default input of count16.asm">1234H (assembly default)</button>
+        </div>
+      </div>
+
+      <div id="sim-body" class="bc">
+        <p class="card invalid-msg" id="invalid-msg" hidden>Fix the highlighted input above to run the simulation.</p>
+
+        <div class="card sized" id="reg-card">
+          <div class="cardhead">
+            <h2>Registers</h2>
+            <span class="stepinfo" id="stepinfo"></span>
+          </div>
+          <div class="regs" id="regs"></div>
+          <div class="counters" id="counters"></div>
+          <p class="inv" id="inv"></p>
+          <p class="opline"><span class="badge" id="op-badge"></span><span id="why"></span></p>
+          <div class="controls" id="controls">
+            <button type="button" id="btn-prev" title="Previous step (Left arrow)">&#9664; Previous</button>
+            <button type="button" id="btn-next" class="primary" title="Next step (Right arrow)">Next step &#9654;</button>
+            <button type="button" id="btn-play" title="Auto-step every 1.2 s (Space)" aria-pressed="false">&#9654; Play</button>
+            <button type="button" id="btn-all" title="Jump to the final step (End)">Run all &#9197;</button>
+            <button type="button" id="btn-reset" title="Back to the initial state (Home)">&#8634; Reset</button>
+            <span class="kbd-hint">Keys: &larr; &rarr; Space Home End</span>
+          </div>
+        </div>
+
+        <div class="card" id="table-card">
+          <h2>Step table</h2>
+          <div class="tablewrap">
+            <table class="steps" id="steps">
+              <thead>
+                <tr>
+                  <th>Step</th>
+                  <th>AX <small>(binary)</small></th>
+                  <th>CF</th>
+                  <th>Action</th>
+                  <th>ONES</th>
+                  <th>ZEROS</th>
+                  <th>Count</th>
+                </tr>
+              </thead>
+              <tbody id="steps-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card" id="result-card">
+          <h2>Result</h2>
+          <div id="result"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="panel-how" role="tabpanel" aria-labelledby="tab-how" hidden>
+      <div class="card prose">
+        <h2>How shift-and-count works</h2>
+        <p>The 8086 has no instruction that counts bits, so the program looks at the 16 bits of <b class="mono">AX</b> <b>one at a time</b>. The trick is the <b>carry flag</b>: <span class="mono">SHR AX,1</span> moves every bit one place to the right, puts a 0 in at the top, and the bit that falls off the bottom (bit 0) lands in <b class="mono">CF</b>. A conditional jump then tests CF and one of two counters goes up.</p>
+        <ul>
+          <li><b class="mono">AX</b>: the 16-bit value. It is shifted right once per cycle, so it is <b>destroyed</b> (it ends as 0000H). The original is saved first with <span class="mono">PUSH AX</span> and restored afterwards with <span class="mono">POP AX</span>.</li>
+          <li><b class="mono">CF</b>: the carry flag. After each shift it holds the bit that was just shifted out.</li>
+          <li><b class="mono">ONES</b> and <b class="mono">ZEROS</b>: the two counters, both start at 0.</li>
+          <li><b class="mono">Count</b>: starts at 16, one cycle per bit.</li>
+        </ul>
+        <p>Every cycle does the same three things:</p>
+        <table class="mini">
+          <thead><tr><th>After SHR AX,1</th><th>Action</th><th>Then</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">CF = 1</td><td class="mono add-c">ONES = ONES + 1</td><td rowspan="2">Count = Count &minus; 1, repeat until Count = 0</td></tr>
+            <tr><td class="mono">CF = 0</td><td class="mono zero-c">ZEROS = ZEROS + 1</td></tr>
+          </tbody>
+        </table>
+        <p><b>Invariant:</b> each cycle adds 1 to exactly one counter, so after <i>k</i> cycles ONES + ZEROS = <i>k</i>, and at the end <b>ONES + ZEROS = 16</b>. This also means ZEROS = 16 &minus; ONES, so one counter would be enough; the program keeps both because the problem asks for both.</p>
+        <p><b>Example, AX = 1234H</b> = <span class="mono">0001 0010 0011 0100</span>. Reading from the right, the bits that drop into CF are 0, 0, 1, 0, 1, 1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0. Five of them are 1, so ONES = <b>5</b> and ZEROS = <b>11</b>.</p>
+        <p><b>Why a logical shift:</b> <span class="mono">SHR</span> always brings a 0 in at the top, so after 16 shifts every original bit has passed through CF exactly once and AX is 0. An arithmetic shift (<span class="mono">SAR</span>) would copy the sign bit back in, which does not matter for the count (only the bit going out is counted) but leaves AX as FFFFH instead of 0000H for negative values.</p>
+      </div>
+
+      <div class="card">
+        <h2>Flowchart</h2>
+        <svg class="flow" viewBox="0 0 640 836" role="img" aria-labelledby="fc-title">
+          <title id="fc-title">Flowchart: start, save AX and set ONES = 0, ZEROS = 0, Count = 16, shift AX right by one so bit 0 goes into CF, if CF = 1 increment ONES otherwise increment ZEROS, decrement Count, repeat until Count is 0, restore AX, end.</title>
+          <defs>
+            <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" class="ah"/>
+            </marker>
+          </defs>
+          <!-- nodes -->
+          <rect class="n term" x="250" y="16" width="140" height="44" rx="22"/>
+          <text x="320" y="44">Start</text>
+
+          <rect class="n" x="160" y="92" width="320" height="64" rx="8"/>
+          <text x="320" y="118">ONES = 0, ZEROS = 0, Count = 16</text>
+          <text x="320" y="142" class="small">save the original AX first (PUSH AX)</text>
+
+          <rect class="n asrn" x="190" y="196" width="260" height="64" rx="8"/>
+          <text x="320" y="222">SHR AX, 1</text>
+          <text x="320" y="246" class="small">bit 0 &#8594; CF, a 0 enters at the top</text>
+
+          <polygon class="n dec" points="320,300 420,352 320,404 220,352"/>
+          <text x="320" y="358">CF = 1 ?</text>
+
+          <rect class="n addn" x="445" y="420" width="170" height="50" rx="8"/>
+          <text x="530" y="451">ONES++</text>
+
+          <rect class="n asrn" x="40" y="420" width="160" height="50" rx="8"/>
+          <text x="120" y="451">ZEROS++</text>
+
+          <rect class="n" x="210" y="548" width="220" height="46" rx="8"/>
+          <text x="320" y="577">Count = Count − 1</text>
+
+          <polygon class="n dec" points="320,628 420,676 320,724 220,676"/>
+          <text x="320" y="682">Count = 0 ?</text>
+
+          <rect class="n term" x="160" y="758" width="320" height="62" rx="31"/>
+          <text x="320" y="785">End: restore AX (POP AX)</text>
+          <text x="320" y="806" class="small">ONES and ZEROS hold the two counts</text>
+
+          <!-- edges -->
+          <path class="e" d="M320,60 V90" marker-end="url(#arr)"/>
+          <path class="e" d="M320,156 V194" marker-end="url(#arr)"/>
+          <path class="e" d="M320,260 V298" marker-end="url(#arr)"/>
+          <path class="e" d="M420,352 H530 V418" marker-end="url(#arr)"/>
+          <text x="470" y="344" class="lbl">Yes</text>
+          <path class="e" d="M220,352 H120 V418" marker-end="url(#arr)"/>
+          <text x="172" y="344" class="lbl">No</text>
+          <path class="e" d="M530,470 V510 H320"/>
+          <path class="e" d="M120,470 V510 H320"/>
+          <path class="e" d="M320,510 V546" marker-end="url(#arr)"/>
+          <path class="e" d="M320,594 V626" marker-end="url(#arr)"/>
+          <path class="e" d="M320,724 V756" marker-end="url(#arr)"/>
+          <text x="334" y="745" class="lbl" text-anchor="start">Yes</text>
+          <path class="e" d="M220,676 H12 V176 H318" marker-end="url(#arr)"/>
+          <text x="196" y="666" class="lbl">No</text>
+        </svg>
+      </div>
+    </section>
+
+    <section id="panel-asm" role="tabpanel" aria-labelledby="tab-asm" hidden>
+      <div class="card prose">
+        <h2>8086 assembly: counting the bits of AX</h2>
+        <p>The same algorithm as the simulator, written with <b>SHR</b>, <b>JNC</b>, <b>INC</b> and <b>LOOP</b>. The value is in <span class="mono">AX</span>, ONES in <span class="mono">BL</span>, ZEROS in <span class="mono">BH</span> and Count in <span class="mono">CX</span>.</p>
+        <ul>
+          <li><b class="mono">count16.asm</b> (NASM, 32-bit Linux): prints the input in hex and binary, a 16-line step table and both counts. <b>To run it:</b> open <a href="https://onecompiler.com/assembly" target="_blank" rel="noopener">onecompiler.com/assembly</a>, delete the sample code, paste the program (use <i>Copy</i> below) and press <b>Run</b>. Change the input in the <span class="mono">num dw 1234h</span> line at the top.</li>
+          <li><b class="mono">count16_8086.asm</b> (MASM/TASM, 8086 lab-manual style): open it in <b>emu8086</b> and press <i>Emulate &rarr; Run</i>, or assemble it in DOSBox with MASM + LINK. It stores the results in the memory variables <span class="mono">ONES</span> and <span class="mono">ZEROS</span> and prints them in decimal.</li>
+        </ul>
+        <p><button type="button" class="linkbtn" id="asm-preset">Show 1234H in the simulator &rarr;</button> <span class="muted">(the same 16 CF values as the program prints)</span></p>
+      </div>
+
+      <div class="card">
+        <div class="codehead">
+          <div class="seg" role="radiogroup" aria-label="Program">
+            <label><input type="radio" name="prog" value="nasm" checked><span>count16.asm (NASM)</span></label>
+            <label><input type="radio" name="prog" value="masm"><span>count16_8086.asm (MASM)</span></label>
+          </div>
+          <div class="codebtns">
+            <button type="button" id="btn-copy">Copy code</button>
+            <a class="btnlink" href="https://onecompiler.com/assembly" target="_blank" rel="noopener">Open OneCompiler &#8599;</a>
+          </div>
+        </div>
+        <pre class="code" id="code" tabindex="0" aria-label="Program source"></pre>
+      </div>
+
+      <div class="card">
+        <h2>Expected output of count16.asm (default input 1234H)</h2>
+        <p class="muted">Copied from a real run (<span class="mono">nasm -f elf32</span>, <span class="mono">ld -m elf_i386</span>). Exit code 0.</p>
+        <pre class="code out" id="asm-out"></pre>
+      </div>
+
+      <div class="card prose">
+        <h2>Which instructions do which step</h2>
+        <div class="tablewrap">
+        <table class="mini map">
+          <thead><tr><th>Algorithm step</th><th>Instructions</th><th>What happens</th></tr></thead>
+          <tbody>
+            <tr><td>Load AX and save it</td><td class="mono">MOV AX,[num]<br>PUSH AX</td><td>The shifting will destroy AX, so a copy goes on the stack first.</td></tr>
+            <tr><td>ONES = 0, ZEROS = 0, Count = 16</td><td class="mono">XOR BL,BL<br>XOR BH,BH<br>MOV CX,16</td><td>XOR of a register with itself gives 0. ONES is in BL, ZEROS in BH, Count in CX.</td></tr>
+            <tr><td>Shift AX right</td><td class="mono">SHR AX,1</td><td>Logical shift: every bit moves one place right, a 0 enters at bit 15 and the old bit 0 goes into <b>CF</b>.</td></tr>
+            <tr><td>CF = 1 ?</td><td class="mono">JNC bit_zero</td><td>JNC jumps when CF = 0 (the bit was a 0). If it does not jump, CF = 1. (<span class="mono">JC</span> is the opposite test and would work with the two branches swapped.)</td></tr>
+            <tr><td class="add-c">ONES++</td><td class="mono">INC BL<br>JMP counted</td><td>Count a 1 bit, then jump over the ZEROS branch.</td></tr>
+            <tr><td class="zero-c">ZEROS++</td><td class="mono">INC BH</td><td>Count a 0 bit. INC does not change CF.</td></tr>
+            <tr><td>Count = Count &minus; 1</td><td class="mono">LOOP next_bit</td><td>LOOP does <span class="mono">DEC CX</span> and <span class="mono">JNZ</span> in one instruction: CX = CX &minus; 1, and jump back while CX is not 0.</td></tr>
+            <tr><td>Restore AX</td><td class="mono">POP AX</td><td>AX is 0000H after 16 shifts; POP brings the original value back. BL and BH hold the answer.</td></tr>
+          </tbody>
+        </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="panel-other" role="tabpanel" aria-labelledby="tab-other" hidden>
+      <div class="card prose">
+        <h2>Other ways to count bits</h2>
+        <h3>1. Rotate instead of shift (ROL / ROR)</h3>
+        <p><span class="mono">ROL AX,1</span> also copies a bit into CF (the bit that leaves the top), but that bit comes back in at the bottom instead of being lost. After <b>16 rotations</b> every bit is back where it started, so <b>AX is intact</b> and no <span class="mono">PUSH</span>/<span class="mono">POP</span> is needed. The loop is otherwise identical: <span class="mono">ROL AX,1</span>, <span class="mono">JNC</span>, <span class="mono">INC</span>, <span class="mono">LOOP</span>.</p>
+        <h3>2. TEST with a mask</h3>
+        <p>Keep a one-bit mask in another register, starting at <span class="mono">0001H</span>. <span class="mono">TEST AX,DX</span> ANDs them without changing either and sets ZF when that bit is 0; then <span class="mono">SHL DX,1</span> moves the mask to the next bit. AX is never changed, but it needs an extra register and the test is on ZF instead of CF.</p>
+        <h3>3. Kernighan's trick: x &amp; (x &minus; 1)</h3>
+        <p>Subtracting 1 flips the lowest 1 bit and every 0 below it, so <span class="mono">x AND (x &minus; 1)</span> <b>clears the lowest 1 bit</b>. Repeat until x = 0 and count the repeats: that is the number of 1s, and ZEROS = 16 &minus; ONES. The loop runs once per 1 bit instead of 16 times.</p>
+        <p class="live" id="other-live"></p>
+        <h3>4. Side by side</h3>
+        <div class="tablewrap">
+        <table class="mini">
+          <thead><tr><th></th><th>SHR + CF (this page)</th><th>ROL + CF</th><th>TEST + mask</th><th>Kernighan</th></tr></thead>
+          <tbody>
+            <tr><td>Loop runs</td><td>16 times</td><td>16 times</td><td>16 times</td><td>once per 1 bit</td></tr>
+            <tr><td>AX afterwards</td><td>0000H (save it first)</td><td>unchanged</td><td>unchanged</td><td>0000H (save it first)</td></tr>
+            <tr><td>Flag tested</td><td>CF</td><td>CF</td><td>ZF</td><td>ZF</td></tr>
+            <tr><td>Extra register</td><td>none</td><td>none</td><td>the mask</td><td>a copy for x &minus; 1</td></tr>
+            <tr><td>Counts 0s directly</td><td>yes</td><td>yes</td><td>yes</td><td>no (16 &minus; ONES)</td></tr>
+          </tbody>
+        </table>
+        </div>
+        <h3>5. Why shift-and-count is the textbook one</h3>
+        <ul>
+          <li>It shows the purpose of the <b>carry flag</b> directly: a shift moves one bit into CF, and <span class="mono">JC</span>/<span class="mono">JNC</span> branch on it.</li>
+          <li>It counts 1s <b>and</b> 0s in the same loop, which is exactly what the problem asks for.</li>
+          <li>It always takes 16 cycles whatever the value is, so the step table is the same size for every input and easy to trace by hand.</li>
+          <li>It uses only the most basic instructions: <span class="mono">SHR</span>, <span class="mono">JNC</span>, <span class="mono">INC</span>, <span class="mono">LOOP</span>.</li>
+        </ul>
+        <p class="muted">Newer processors have a single instruction for this (<span class="mono">POPCNT</span>), but the 8086 does not.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <strong>Team</strong>
+    <ul>
+      <li>TEAM_MEMBER_1<span>REG_1</span></li>
+      <li>TEAM_MEMBER_2<span>REG_2</span></li>
+      <li>TEAM_MEMBER_3<span>REG_3</span></li>
+    </ul>
+  </footer>
+</div>
+
+<!--
+  BIT-COUNT CORE: pure functions with no DOM access.
+  test.js extracts THIS script block from bitcount.html and runs it under Node,
+  so the browser and the tests always exercise the exact same code.
+-->
+<script id="bitcount-core">
+(function (root) {
+  'use strict';
+
+  var WIDTH = 16;          // AX is a 16-bit register
+  var MAX = 0xFFFF;
+
+  // Unsigned binary string of value, zero-padded to width bits.
+  function toBits(value, width) {
+    var s = value.toString(2);
+    while (s.length < width) s = '0' + s;
+    return s;
+  }
+
+  // Upper-case hex string, zero-padded to digits.
+  function toHex(value, digits) {
+    var s = value.toString(16).toUpperCase();
+    while (s.length < digits) s = '0' + s;
+    return s;
+  }
+
+  // Parse what the user typed. base is 'dec' or 'hex'.
+  // Hex accepts 1234, 1234H, 0x1234 (any case). Returns { v } or { err }.
+  // A leading minus is parsed (so validate() can explain why it is rejected).
+  function parseNumber(text, base) {
+    var s = String(text).trim().replace(/−/g, '-').replace(/[\s_]/g, '');
+    if (s === '') return { err: 'Enter a number.' };
+    var neg = false;
+    if (s[0] === '-' || s[0] === '+') { neg = s[0] === '-'; s = s.slice(1); }
+    var v;
+    if (base === 'hex') {
+      var m = /^(?:0x([0-9a-f]+)|([0-9a-f]+)h?)$/i.exec(s);
+      if (!m) return { err: 'Hex digits only (0-9, A-F), e.g. 1234 or 1234H.' };
+      v = parseInt(m[1] || m[2], 16);
+    } else {
+      if (!/^\d+$/.test(s)) return { err: 'Whole numbers only, e.g. 4660 or 65535.' };
+      v = parseInt(s, 10);
+    }
+    return { v: neg ? -v : v };
+  }
+
+  // Returns { ok, error }. The message is written for the UI.
+  function validate(v) {
+    var error = '';
+    if (v === null || v === undefined || v === '' || (typeof v === 'number' && isNaN(v))) {
+      error = 'Enter a number.';
+    } else if (typeof v !== 'number' || !isFinite(v) || Math.floor(v) !== v) {
+      error = 'Whole numbers only.';
+    } else if (v < 0) {
+      error = 'No negative numbers: enter the 16-bit pattern itself, 0000H to FFFFH.';
+    } else if (v > MAX) {
+      error = 'AX is 16 bits: the value must be between 0 and 65535 (0000H to FFFFH).';
+    }
+    return { ok: error === '', error: error };
+  }
+
+  /*
+    Shift-and-count, textbook form.
+      AX = 16-bit value, ONES = 0, ZEROS = 0, Count = 16
+      repeat until Count = 0:
+        shift AX right by 1 (logical); the bit shifted out goes into CF
+        if CF = 1 then ONES = ONES + 1 else ZEROS = ZEROS + 1
+        Count = Count - 1
+    ONES + ZEROS = 16 at the end, because every cycle counts exactly one bit.
+    The shifting destroys AX, so the original value is saved first.
+  */
+  function count(value) {
+    var v = validate(value);
+    if (!v.ok) {
+      var e = new Error('Invalid input: ' + v.error);
+      e.error = v.error;
+      throw e;
+    }
+    var saved = value;                 // PUSH AX: keep the original
+    var AX = value, CF = null, ONES = 0, ZEROS = 0, cnt = WIDTH;
+    var rows = [];
+    function row(o) {
+      o.ax = toBits(AX, WIDTH); o.axVal = AX; o.cf = CF === null ? '' : String(CF);
+      o.ones = ONES; o.zeros = ZEROS; o.count = cnt;
+      rows.push(o);
+    }
+
+    row({ kind: 'init', step: 0, label: 'Initial', action: 'Save AX',
+      why: 'AX = ' + toHex(value, 4) + 'H is saved first (PUSH AX). ONES = 0, ZEROS = 0, Count = 16.' });
+
+    for (var step = 1; step <= WIDTH; step++) {
+      CF = AX % 2;                     // SHR AX,1: bit 0 drops into CF ...
+      AX = Math.floor(AX / 2);         // ... and a 0 enters at the top
+      if (CF === 1) ONES += 1; else ZEROS += 1;
+      cnt -= 1;
+      row({ kind: CF === 1 ? 'one' : 'zero', step: step, label: String(step),
+        action: CF === 1 ? 'ONES++' : 'ZEROS++',
+        why: 'CF = ' + CF + ', so ' + (CF === 1 ? 'ONES++ (ONES = ' + ONES + ')' : 'ZEROS++ (ZEROS = ' + ZEROS + ')') +
+          '. Count = ' + cnt + (cnt > 0 ? '.' : ', so stop. POP AX restores ' + toHex(saved, 4) + 'H.') });
+    }
+
+    return {
+      value: value, hex: toHex(value, 4), bits: toBits(value, WIDTH),
+      saved: saved,                    // what POP AX puts back into AX
+      rows: rows,
+      cfs: rows.slice(1).map(function (r) { return +r.cf; }),   // CF after each shift
+      ones: ONES, zeros: ZEROS, total: ONES + ZEROS
+    };
+  }
+
+  root.BitCount = {
+    WIDTH: WIDTH, MAX: MAX, toBits: toBits, toHex: toHex,
+    parseNumber: parseNumber, validate: validate, count: count
+  };
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+</script>
+
+<!-- The assembly programs, embedded so the page works offline from file://.
+     test.js checks they are identical to count16.asm and count16_8086.asm, and
+     test_asm.sh checks the output block against a real run. -->
+<script type="text/plain" id="src-nasm">
+;=====================================================================
+; count16.asm  -  count the 1 bits and the 0 bits of the AX register
+;                 by the SHIFT-AND-COUNT method
+;
+; COA Lab Problem 16: Count the total number of set bits (1s) and
+;                     cleared bits (0s) within the AX register.
+;
+; Assembler : NASM, 32-bit Linux (system calls through int 0x80)
+; Online    : paste this whole file into https://onecompiler.com/assembly
+;             and press Run.
+; Locally   : nasm -f elf32 count16.asm -o count16.o
+;             ld -m elf_i386 count16.o -o count16
+;             ./count16
+;
+; Algorithm:
+;     AX = the 16-bit value, ONES = 0, ZEROS = 0, Count = 16
+;     repeat until Count = 0:
+;         shift AX right by 1 (logical) ; SHR: the bit shifted out -> CF
+;         if CF = 1 then ONES  = ONES  + 1
+;                   else ZEROS = ZEROS + 1
+;         Count = Count - 1
+;     ONES + ZEROS = 16 always, because every cycle counts exactly one bit.
+;     The shifting destroys AX (it ends as 0000H), so the original value
+;     is saved on the stack first (PUSH AX) and restored at the end (POP AX).
+;
+; Register map of the algorithm (16-bit and 8-bit registers only):
+;     AX = the value being shifted        CX = Count
+;     BL = ONES  (number of 1 bits)       BH = ZEROS (number of 0 bits)
+; 32-bit registers appear only inside the print / system-call helpers
+; at the end of the file, and every helper preserves AX, BX and CX,
+; so the algorithm never sees them change.
+;=====================================================================
+
+section .data
+    ;------------------------------------------------------------------
+    ; INPUT: change the number here (hex with an h suffix).
+    ; A value that starts with A-F needs a leading 0, e.g. 0FFFFh.
+    ;------------------------------------------------------------------
+    num         dw 1234h            ; the value loaded into AX
+
+    ; text printed by the helpers
+    msg_title   db "Count 1s and 0s in AX", 10
+    len_title   equ $ - msg_title
+    msg_ax      db "AX    : "
+    len_ax      equ $ - msg_ax
+    msg_hopen   db "H ("                ; between the hex and binary forms
+    len_hopen   equ $ - msg_hopen
+    msg_bclose  db "b)", 10
+    len_bclose  equ $ - msg_bclose
+    msg_head    db "Step | CF | Action", 10
+    len_head    equ $ - msg_head
+    msg_bar     db "   | "              ; after the step number
+    len_bar     equ $ - msg_bar
+    msg_one     db "  | ONES++", 10     ; after CF when CF = 1
+    len_one     equ $ - msg_one
+    msg_zero    db "  | ZEROS++", 10    ; after CF when CF = 0
+    len_zero    equ $ - msg_zero
+    msg_ones    db "Ones  : "
+    len_ones    equ $ - msg_ones
+    msg_zeros   db "Zeros : "
+    len_zeros   equ $ - msg_zeros
+    msg_nl      db 10
+    hexdigits   db "0123456789ABCDEF"
+
+section .bss
+    numbuf      resb 12                 ; decimal digits are built here
+    hexbuf      resb 8                  ; hex digits are built here
+    binbuf      resb 16                 ; binary digits are built here
+    save_cnt    resw 1                  ; helper scratch: BX (ZEROS:ONES)
+    save_e      resd 1                  ; helper scratch: a 32-bit value
+
+section .text
+    global _start
+
+;=====================================================================
+; MAIN PROGRAM: the shift-and-count algorithm
+;=====================================================================
+_start:
+    ;--- print the title, the input and the table heading -------------
+    call    print_banner
+
+    ;--- Step 1: load the value and save a copy -----------------------
+    mov     ax, [num]           ; AX = the value to examine
+    push    ax                  ; save the original AX (shifting destroys it)
+
+    ;--- Step 2: initialise the counters ------------------------------
+    xor     bl, bl              ; BL = ONES  = 0
+    xor     bh, bh              ; BH = ZEROS = 0
+    mov     cx, 16              ; CX = Count = 16 bits
+
+next_bit:
+    ;--- Step 3: shift AX right by 1, the lowest bit drops into CF ----
+    shr     ax, 1               ; logical shift: 0 enters at the top
+    jnc     bit_zero            ; CF = 0: the bit was a 0
+
+    ;--- Step 4a: CF = 1, so count a one ------------------------------
+    inc     bl                  ; ONES = ONES + 1   (INC leaves CF alone)
+    jmp     counted
+
+bit_zero:
+    ;--- Step 4b: CF = 0, so count a zero -----------------------------
+    inc     bh                  ; ZEROS = ZEROS + 1 (INC leaves CF alone)
+
+counted:
+    ;--- print this step: number, CF, ONES++ / ZEROS++ ----------------
+    call    print_step
+
+    ;--- Step 5: Count = Count - 1, repeat until Count = 0 ------------
+    loop    next_bit            ; CX = CX - 1, jump if CX is not 0
+
+    ;--- Step 6: AX is now 0000H, so restore the saved original -------
+    pop     ax                  ; AX = original value again
+
+    ;--- Step 7: BL = number of 1s, BH = number of 0s -----------------
+    call    print_result
+    call    exit_program
+
+
+;=====================================================================
+; HELPERS (printing and system calls). These are the only places that
+; use 32-bit registers. Each public helper saves and restores AX, BX
+; and CX with push/pop. (32-bit values are parked in memory rather than
+; pushed, so the file also assembles as 64-bit code if an online
+; compiler uses nasm -f elf64.)
+;
+; On a real 8086 LOOP counts with CX. In this 32-bit build the same
+; instruction counts with the whole of ECX, so every public helper ends
+; with "movzx ecx, cx", which keeps the upper half of ECX at zero and
+; makes ECX equal to CX.
+;=====================================================================
+
+;---------------------------------------------------------------------
+; print_banner: title, "AX    : 1234H (0001001000110100b)" and the
+;               table heading.
+;---------------------------------------------------------------------
+print_banner:
+    push    ax
+    push    bx
+    push    cx
+    mov     ecx, msg_title
+    mov     edx, len_title
+    call    write
+    mov     ecx, msg_ax
+    mov     edx, len_ax
+    call    write
+    movzx   eax, word [num]
+    mov     ecx, 4
+    call    put_hex             ; the value as 4 hex digits
+    mov     ecx, msg_hopen
+    mov     edx, len_hopen
+    call    write
+    movzx   eax, word [num]
+    call    put_bin16           ; the value as 16 binary digits
+    mov     ecx, msg_bclose
+    mov     edx, len_bclose
+    call    write
+    mov     ecx, msg_head
+    mov     edx, len_head
+    call    write
+    pop     cx
+    pop     bx
+    pop     ax
+    movzx   ecx, cx             ; ECX = CX (see the note above)
+    ret
+
+;---------------------------------------------------------------------
+; print_step: one table line, e.g. " 3   | 1  | ONES++"
+;   in: CF = the bit that SHR just shifted out (CALL, PUSH, MOV, INC
+;            and JMP do not change CF, so it is still valid here)
+;       CX = Count before it is decremented (16..1), so step = 17 - CX
+;---------------------------------------------------------------------
+print_step:
+    push    ax
+    push    bx
+    push    cx
+    mov     dword [save_e], 0   ; remember CF as 0 or 1 (MOV keeps flags)
+    jnc     .cf_saved
+    mov     dword [save_e], 1
+.cf_saved:
+    ; step number, right-aligned in 2 columns
+    movzx   eax, cx
+    neg     eax
+    add     eax, 17             ; EAX = 17 - Count = step number
+    cmp     eax, 10
+    jae     .two_digits
+    push    ax                  ; keep the step number over the write
+    mov     ecx, msg_bar        ; a leading space (first byte of "   | ")
+    mov     edx, 1
+    call    write
+    pop     ax
+    movzx   eax, ax
+.two_digits:
+    call    put_dec
+    mov     ecx, msg_bar
+    mov     edx, len_bar
+    call    write
+    ; CF as '0' or '1', then the action
+    mov     eax, [save_e]
+    call    put_dec
+    mov     ecx, msg_zero
+    mov     edx, len_zero
+    cmp     dword [save_e], 0
+    je      .action
+    mov     ecx, msg_one
+    mov     edx, len_one
+.action:
+    call    write
+    pop     cx
+    pop     bx
+    pop     ax
+    movzx   ecx, cx             ; ECX = CX (see the note above)
+    ret
+
+;---------------------------------------------------------------------
+; print_result: "Ones  : 5" and "Zeros : 11"
+;   in: BL = ONES, BH = ZEROS
+;---------------------------------------------------------------------
+print_result:
+    push    ax
+    push    bx
+    push    cx
+    mov     [save_cnt], bx      ; the syscalls clobber BX
+    mov     ecx, msg_ones
+    mov     edx, len_ones
+    call    write
+    movzx   eax, byte [save_cnt]        ; low byte = BL = ONES
+    call    put_dec
+    mov     ecx, msg_nl
+    mov     edx, 1
+    call    write
+    mov     ecx, msg_zeros
+    mov     edx, len_zeros
+    call    write
+    movzx   eax, byte [save_cnt + 1]    ; high byte = BH = ZEROS
+    call    put_dec
+    mov     ecx, msg_nl
+    mov     edx, 1
+    call    write
+    pop     cx
+    pop     bx
+    pop     ax
+    movzx   ecx, cx             ; ECX = CX (see the note above)
+    ret
+
+;---------------------------------------------------------------------
+; exit_program: sys_exit(0)
+;---------------------------------------------------------------------
+exit_program:
+    mov     eax, 1              ; sys_exit
+    xor     ebx, ebx            ; exit code 0
+    int     0x80
+
+;---------------------------------------------------------------------
+; Low-level helpers below may change any register; only the public
+; helpers above call them.
+;---------------------------------------------------------------------
+
+; put_hex: print the low ECX hex digits of EAX (shifts and a table)
+put_hex:
+    mov     edi, ecx            ; EDI = number of digits
+.digit:
+    mov     edx, eax
+    and     edx, 0Fh            ; lowest nibble
+    mov     dl, [hexdigits + edx]
+    mov     [hexbuf + ecx - 1], dl   ; fill the buffer from the right
+    shr     eax, 4
+    dec     ecx
+    jnz     .digit
+    mov     ecx, hexbuf
+    mov     edx, edi
+    call    write
+    ret
+
+; put_bin16: print the low 16 bits of EAX as 16 binary digits
+put_bin16:
+    mov     ecx, 16
+.bit:
+    mov     dl, '0'
+    shr     eax, 1              ; lowest bit -> CF
+    adc     dl, 0               ; '0' + CF = '0' or '1'
+    mov     [binbuf + ecx - 1], dl   ; fill the buffer from the right
+    dec     ecx
+    jnz     .bit
+    mov     ecx, binbuf
+    mov     edx, 16
+    call    write
+    ret
+
+; put_dec: print EAX as an unsigned decimal number (DIV by 10)
+put_dec:
+    mov     edi, numbuf + 12    ; fill the buffer from the right
+    mov     ebx, 10
+.digit:
+    xor     edx, edx
+    div     ebx                 ; EAX = EAX / 10, EDX = remainder 0..9
+    add     dl, '0'
+    dec     edi
+    mov     [edi], dl
+    test    eax, eax
+    jnz     .digit
+    mov     ecx, edi            ; first digit
+    mov     edx, numbuf + 12
+    sub     edx, edi            ; number of digits
+    call    write
+    ret
+
+; write: sys_write(stdout, ECX = address, EDX = length)
+write:
+    mov     eax, 4              ; sys_write
+    mov     ebx, 1              ; file descriptor 1 = stdout
+    int     0x80
+    ret
+</script>
+<script type="text/plain" id="src-masm">
+;=====================================================================
+; COUNT16_8086.ASM - count the 1 bits and the 0 bits of the AX register
+;                    by the SHIFT-AND-COUNT method on the 8086
+;
+; COA Lab Problem 16: Count the total number of set bits (1s) and
+;                     cleared bits (0s) within the AX register.
+;
+; Assembler : MASM / TASM (DOSBox) or emu8086
+; emu8086   : File > Open this file, then Emulate > Run.
+; DOSBox    : copy it as COUNT16.ASM (DOS uses 8.3 file names), then
+;               MASM COUNT16.ASM;   LINK COUNT16.OBJ;   COUNT16
+;             or TASM COUNT16.ASM   TLINK COUNT16.OBJ   COUNT16
+;
+; Algorithm:
+;     AX = the 16-bit value, ONES = 0 (BL), ZEROS = 0 (BH), Count = 16 (CX)
+;     repeat until Count = 0:
+;         shift AX right by 1 (logical)   (SHR: the bit shifted out -> CF)
+;         if CF = 1 then ONES  = ONES  + 1   (JNC skips this, INC BL)
+;                   else ZEROS = ZEROS + 1   (INC BH)
+;         Count = Count - 1                  (LOOP)
+;     ONES + ZEROS = 16 always. The shifting destroys AX, so the original
+;     value is saved with PUSH AX and restored with POP AX.
+;     The results are stored in the memory variables ONES and ZEROS and
+;     printed in decimal.
+;
+; Expected output for the default input:
+;     COUNT 1S AND 0S IN AX
+;     AX    : 1234H
+;     ONES  : 5
+;     ZEROS : 11
+;=====================================================================
+
+.MODEL SMALL
+.STACK 100H
+
+.DATA
+    NUM     DW 1234H                ; the value loaded into AX  <-- change it here
+    ONES    DB 0                    ; result: number of 1 bits
+    ZEROS   DB 0                    ; result: number of 0 bits
+
+    MSG1    DB 'COUNT 1S AND 0S IN AX', 0DH, 0AH, '$'
+    MSG2    DB 'AX    : $'
+    MSG3    DB 'H', 0DH, 0AH, 'ONES  : $'
+    MSG4    DB 0DH, 0AH, 'ZEROS : $'
+    MSG5    DB 0DH, 0AH, '$'
+
+.CODE
+MAIN PROC
+    ;--- initialise the data segment ---------------------------------
+    MOV AX, @DATA
+    MOV DS, AX
+
+    ;--- print the title and the input -------------------------------
+    LEA DX, MSG1
+    MOV AH, 09H                     ; DOS: print '$'-terminated string
+    INT 21H
+    LEA DX, MSG2
+    MOV AH, 09H
+    INT 21H
+    MOV BX, NUM
+    CALL PRINT_HEX16                ; the value in hex
+
+    ;--- Step 1: load the value and save a copy ----------------------
+    MOV AX, NUM                     ; AX = the value to examine
+    PUSH AX                         ; save the original AX (shifting destroys it)
+
+    ;--- Step 2: initialise the counters -----------------------------
+    XOR BL, BL                      ; BL = ONES  = 0
+    XOR BH, BH                      ; BH = ZEROS = 0
+    MOV CX, 16                      ; CX = Count = 16
+
+NEXT_BIT:
+    ;--- Step 3: shift AX right by 1, the lowest bit drops into CF ---
+    SHR AX, 1                       ; logical: 0 enters at the top
+    JNC BIT_ZERO                    ; CF = 0: the bit was a 0
+
+    ;--- Step 4a: CF = 1, so count a one -----------------------------
+    INC BL                          ; ONES = ONES + 1
+    JMP COUNTED
+
+BIT_ZERO:
+    ;--- Step 4b: CF = 0, so count a zero ----------------------------
+    INC BH                          ; ZEROS = ZEROS + 1
+
+COUNTED:
+    ;--- Step 5: Count = Count - 1, repeat until Count = 0 -----------
+    LOOP NEXT_BIT                   ; CX = CX - 1, jump if CX is not 0
+
+    ;--- Step 6: AX is now 0000H, so restore the saved original ------
+    POP AX                          ; AX = original value again
+
+    ;--- Step 7: store the results in memory -------------------------
+    MOV ONES, BL
+    MOV ZEROS, BH
+
+    ;--- print both counts in decimal --------------------------------
+    LEA DX, MSG3
+    MOV AH, 09H
+    INT 21H
+    MOV AL, ONES
+    CALL PRINT_DEC8                 ; number of 1 bits
+    LEA DX, MSG4
+    MOV AH, 09H
+    INT 21H
+    MOV AL, ZEROS
+    CALL PRINT_DEC8                 ; number of 0 bits
+    LEA DX, MSG5
+    MOV AH, 09H
+    INT 21H
+
+    ;--- return to DOS -----------------------------------------------
+    MOV AH, 4CH
+    INT 21H
+MAIN ENDP
+
+;---------------------------------------------------------------------
+; PRINT_HEX16: print BX as 4 hex digits with INT 21H, AH = 02H.
+; Rotates the top nibble into the bottom each time.
+; All registers are preserved.
+;---------------------------------------------------------------------
+PRINT_HEX16 PROC
+    PUSH AX
+    PUSH BX
+    PUSH CX
+    PUSH DX
+    MOV CX, 4                       ; 4 hex digits
+PH_NEXT:
+    PUSH CX
+    MOV CL, 4
+    ROL BX, CL                      ; next nibble -> low 4 bits of BX
+    POP CX
+    MOV DL, BL
+    AND DL, 0FH                     ; DL = 0..15
+    CMP DL, 9
+    JBE PH_DIGIT
+    ADD DL, 7                       ; 10..15 -> 'A'..'F'
+PH_DIGIT:
+    ADD DL, '0'
+    MOV AH, 02H                     ; DOS: print the character in DL
+    INT 21H
+    LOOP PH_NEXT
+    POP DX
+    POP CX
+    POP BX
+    POP AX
+    RET
+PRINT_HEX16 ENDP
+
+;---------------------------------------------------------------------
+; PRINT_DEC8: print AL (0..99) in decimal with INT 21H, AH = 02H.
+; DIV by 10 gives the tens digit in AL and the units digit in AH.
+; A leading zero is not printed. All registers are preserved.
+;---------------------------------------------------------------------
+PRINT_DEC8 PROC
+    PUSH AX
+    PUSH BX
+    PUSH DX
+    MOV AH, 0                       ; AX = the number
+    MOV BL, 10
+    DIV BL                          ; AL = tens, AH = units
+    MOV BX, AX                      ; BL = tens, BH = units (INT 21H changes AL)
+    CMP BL, 0
+    JE PD_UNITS                     ; no tens digit for 0..9
+    MOV DL, BL
+    ADD DL, '0'
+    MOV AH, 02H                     ; DOS: print the character in DL
+    INT 21H
+PD_UNITS:
+    MOV DL, BH
+    ADD DL, '0'
+    MOV AH, 02H
+    INT 21H
+    POP DX
+    POP BX
+    POP AX
+    RET
+PRINT_DEC8 ENDP
+
+END MAIN
+</script>
+<script type="text/plain" id="src-output">
+Count 1s and 0s in AX
+AX    : 1234H (0001001000110100b)
+Step | CF | Action
+ 1   | 0  | ZEROS++
+ 2   | 0  | ZEROS++
+ 3   | 1  | ONES++
+ 4   | 0  | ZEROS++
+ 5   | 1  | ONES++
+ 6   | 1  | ONES++
+ 7   | 0  | ZEROS++
+ 8   | 0  | ZEROS++
+ 9   | 0  | ZEROS++
+10   | 1  | ONES++
+11   | 0  | ZEROS++
+12   | 0  | ZEROS++
+13   | 1  | ONES++
+14   | 0  | ZEROS++
+15   | 0  | ZEROS++
+16   | 0  | ZEROS++
+Ones  : 5
+Zeros : 11
+</script>
+
+<script id="app">
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+
+  // ---------- tabs ----------
+  var tabs = Array.prototype.slice.call(document.querySelectorAll('nav.tabs [role="tab"]'));
+  function selectTab(tab) {
+    tabs.forEach(function (t) {
+      var on = t === tab;
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+      t.tabIndex = on ? 0 : -1;
+      $(t.getAttribute('aria-controls')).hidden = !on;
+    });
+  }
+  tabs.forEach(function (t, i) {
+    t.addEventListener('click', function () { selectTab(t); });
+    t.addEventListener('keydown', function (e) {
+      var d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+      if (!d) return;
+      var next = tabs[(i + d + tabs.length) % tabs.length];
+      next.focus(); selectTab(next);
+    });
+  });
+
+  // ---------- theme (light by default; the choice is shared with the Q15 page) ----------
+  var root = document.documentElement;
+  function setTheme(t) {
+    if (t === 'dark') root.setAttribute('data-theme', 'dark'); else root.removeAttribute('data-theme');
+    var b = $('theme-btn'), dark = t === 'dark';
+    b.setAttribute('aria-pressed', dark ? 'true' : 'false');
+    b.innerHTML = (dark ? '&#9728;' : '&#9790;') + '<span class="tlabel"> ' + (dark ? 'Light mode' : 'Dark mode') + '</span>';
+    b.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
+  }
+  var saved = null;
+  try { saved = localStorage.getItem('shiftadd-theme'); } catch (e) {}
+  setTheme(saved === 'dark' ? 'dark' : 'light');
+  $('theme-btn').addEventListener('click', function () {
+    var t = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    setTheme(t);
+    try { localStorage.setItem('shiftadd-theme', t); } catch (e) {}
+  });
+
+  // ---------- helpers ----------
+  var BC = window.BitCount;
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function hex4(v) { return BC.toHex(v, 4) + 'H'; }
+  function nibbles(bits) { return bits.replace(/(.{4})(?=.)/g, '$1 '); }
+
+  // 16 bit boxes grouped into nibbles.
+  // opts: { mark: index to highlight, slide: animate a right shift }
+  function bitBoxes(bits, opts) {
+    opts = opts || {};
+    var h = '<span class="bits"><span class="word">';
+    for (var i = 0; i < bits.length; i++) {
+      if (i % 4 === 0) h += (i ? '</span>' : '') + '<span class="nib">';
+      var c = 'bit';
+      if (opts.mark === i) c += ' pair';
+      if (opts.slide) c += i === 0 ? ' enter' : ' slide';
+      h += '<span class="' + c + '">' + bits[i] + '</span>';
+    }
+    return h + '</span></span></span>';
+  }
+  // Bit text for the table: nibbles separated by a space, leading zeros greyed.
+  function bitText(bits) {
+    var lead = bits.indexOf('1');
+    if (lead === -1) lead = bits.length - 1;
+    var h = '<span class="tw">';
+    for (var i = 0; i < bits.length; i++) {
+      if (i && i % 4 === 0) h += ' ';
+      h += i < lead ? '<span class="x">' + bits[i] + '</span>' : bits[i];
+    }
+    return h + '</span>';
+  }
+
+  // ---------- state ----------
+  var state = { run: null, cur: 0, timer: null };
+  var inV = $('in-v');
+  var lastBase = 'hex';   // base the input is currently written in
+
+  function base() { return document.querySelector('input[name="base"]:checked').value; }
+
+  function load() {
+    stopPlay();
+    var b = base();
+    document.querySelector('.unit').textContent = b;
+    var p = BC.parseNumber(inV.value, b);
+    var v = BC.validate(p.err ? NaN : p.v);
+    var msg = p.err || v.error;
+    $('err-v').textContent = msg || '';
+    if (msg) inV.setAttribute('aria-invalid', 'true'); else inV.removeAttribute('aria-invalid');
+    $('sim-body').classList.toggle('invalid', !!msg);
+    $('invalid-msg').hidden = !msg;
+    if (msg) { state.run = null; updateControls(); return; }
+    state.run = BC.count(p.v);
+    state.cur = 0;
+    renderOtherLive();
+    buildTable();
+    render(false);
+  }
+
+  // ---------- table ----------
+  var rowEls = [];
+  function buildTable() {
+    var R = state.run, body = $('steps-body');
+    body.innerHTML = '';
+    rowEls = R.rows.map(function (row, i) {
+      var tr = document.createElement('tr');
+      tr.className = 'k-' + row.kind;
+      tr.innerHTML =
+        '<td class="step">' + esc(row.label) + '</td>' +
+        '<td class="b" title="AX = ' + hex4(row.axVal) + '">' + bitText(row.ax) + '</td>' +
+        '<td class="b">' + (row.cf === '' ? '<span class="x">&ndash;</span>' : row.cf) + '</td>' +
+        '<td class="op"><span class="opname">' + esc(row.action) + '</span></td>' +
+        '<td class="b">' + row.ones + '</td>' +
+        '<td class="b">' + row.zeros + '</td>' +
+        '<td class="b">' + row.count + '</td>';
+      tr.addEventListener('click', function () { stopPlay(); go(i); });
+      body.appendChild(tr);
+      return tr;
+    });
+  }
+
+  // ---------- render current step ----------
+  // anim is true only when moving forward by exactly one step: the bits slide
+  // right, the outgoing bit drops into CF and the matching counter ticks.
+  function render(anim) {
+    var R = state.run;
+    if (!R) return;
+    var i = state.cur, row = R.rows[i], last = R.rows.length - 1, done = i === last;
+    var cfCls = row.cf === '' ? 'none' : row.cf === '1' ? 'one' : 'zero';
+    $('regs').innerHTML =
+      '<div class="reg"><div class="lbl"><b>AX</b><small>' + (done ? 'all 16 bits shifted out' : 'shifted right &middot; bit 0 goes to CF') + '</small>' +
+        '<span class="val">= ' + hex4(row.axVal) + ' &middot; ' + row.axVal + '</span></div>' +
+        '<div class="rbits axrow">' + bitBoxes(row.ax, { mark: done ? -1 : 15, slide: anim }) +
+        '<span class="arrow" aria-hidden="true">&rarr;</span>' +
+        '<span class="cfwrap"><small>CF</small><span class="bit cf ' + cfCls + (anim ? ' drop' : '') + '">' +
+        (row.cf === '' ? '&ndash;' : row.cf) + '</span></span></div></div>' +
+      '<div class="reg"><div class="lbl"><b>Saved AX</b><small>copy on the stack (PUSH AX)</small></div>' +
+        '<div class="rbits savedax"><span>' + hex4(R.saved) + '</span><small>' + nibbles(R.bits) +
+        (done ? ' &middot; POP AX puts it back' : ' &middot; untouched by the shifts') + '</small></div></div>';
+
+    $('counters').innerHTML =
+      '<div class="ctr ones' + (anim && row.kind === 'one' ? ' tick' : '') + '"><small>ONES</small><b>' + row.ones + '</b><span>1 bits counted</span></div>' +
+      '<div class="ctr zeros' + (anim && row.kind === 'zero' ? ' tick' : '') + '"><small>ZEROS</small><b>' + row.zeros + '</b><span>0 bits counted</span></div>' +
+      '<div class="ctr cnt"><small>Count</small><b>' + row.count + '</b><span>bits left</span></div>';
+    $('inv').innerHTML = '<b>Invariant:</b> ONES + ZEROS = ' + row.ones + ' + ' + row.zeros + ' = <b>' + (row.ones + row.zeros) + '</b>' +
+      (done ? ' &check; (all 16 bits counted)' : ' = bits examined so far (16 &minus; Count = ' + (16 - row.count) + '). It reaches 16 when Count = 0.');
+
+    var opline = $('op-badge').parentNode;
+    opline.className = 'opline k-' + row.kind;
+    $('op-badge').textContent = row.kind === 'init' ? 'Initial' : row.action;
+    $('why').textContent = row.why;
+    $('stepinfo').textContent = 'Step ' + i + ' of ' + last;
+
+    rowEls.forEach(function (tr, k) {
+      tr.hidden = k > i;
+      tr.classList.toggle('current', k === i);
+    });
+    renderResult(done);
+    updateControls();
+  }
+
+  function renderResult(done) {
+    var R = state.run, el = $('result');
+    if (!done) {
+      el.innerHTML = '<p class="muted">The counts appear when Count reaches 0 (step 16).</p>';
+      return;
+    }
+    // Independent check, computed outside the core: write the value in binary
+    // with toString(2) and count the characters.
+    var bin = R.value.toString(2), ones = 0;
+    for (var k = 0; k < bin.length; k++) if (bin.charAt(k) === '1') ones++;
+    var zeros = 16 - ones;
+    var sumOk = R.ones + R.zeros === 16;
+    var indOk = R.ones === ones && R.zeros === zeros;
+    el.innerHTML =
+      '<p class="muted">AX = ' + hex4(R.value) + ' = <span class="mono">' + nibbles(R.bits) + '</span> = ' + R.value + '<sub style="font-size:.7em">10</sub></p>' +
+      '<div class="resnums"><div class="ctr ones"><small>ONES</small><b>' + R.ones + '</b><span>set bits (1s)</span></div>' +
+      '<div class="ctr zeros"><small>ZEROS</small><b>' + R.zeros + '</b><span>cleared bits (0s)</span></div></div>' +
+      '<p class="check ' + (sumOk ? 'ok' : 'bad') + '">ONES + ZEROS = ' + R.ones + ' + ' + R.zeros + ' = ' + (R.ones + R.zeros) +
+        (sumOk ? '  ✓' : '  ✗ (expected 16)') + '</p><br>' +
+      '<p class="check ' + (indOk ? 'ok' : 'bad') + '">Independent check: ' + ones + ' ones, ' + zeros + ' zeros' +
+        (indOk ? '  ✓' : '  ✗ (the algorithm gave ' + R.ones + ' and ' + R.zeros + ')') +
+        '<small>counted from value.toString(2) = "' + bin + '", outside the algorithm</small></p>' +
+      '<p class="muted">AX itself is 0000H after the 16 shifts; <span class="mono">POP AX</span> restores the saved ' + hex4(R.saved) + '.</p>';
+  }
+
+  // Live comparison on the "Other methods" tab for the value currently loaded.
+  function renderOtherLive() {
+    var R = state.run, x = R.value, trail = [], n = 0;
+    while (x !== 0) { x = x & (x - 1); n++; if (trail.length < 17) trail.push(hex4(x)); }
+    $('other-live').innerHTML = '<b>Your current value</b> AX = <span class="mono">' + hex4(R.value) + '</span>: ' +
+      'shift-and-count always loops <b>16</b> times; Kernighan\'s loop would run <b>' + n + '</b> time' + (n === 1 ? '' : 's') +
+      (n ? ' (<span class="mono">' + hex4(R.value) + ' &rarr; ' + trail.join(' &rarr; ') + '</span>)' : '') +
+      ', giving ONES = ' + n + ' and ZEROS = 16 &minus; ' + n + ' = ' + (16 - n) + '.';
+  }
+
+  // ---------- navigation ----------
+  function go(i) {
+    if (!state.run) return;
+    var before = state.cur;
+    state.cur = Math.max(0, Math.min(state.run.rows.length - 1, i));
+    render(state.cur === before + 1);
+  }
+  var PLAY_MS = 1200;
+  function playing() { return state.timer !== null; }
+  function stopPlay() {
+    if (state.timer !== null) { clearInterval(state.timer); state.timer = null; }
+    updateControls();
+  }
+  function startPlay() {
+    if (!state.run) return;
+    if (state.cur === state.run.rows.length - 1) go(0);   // replay from the start
+    state.timer = setInterval(function () {
+      if (state.cur >= state.run.rows.length - 1) { stopPlay(); return; }
+      go(state.cur + 1);
+      if (state.cur >= state.run.rows.length - 1) stopPlay();
+    }, PLAY_MS);
+    updateControls();
+  }
+  function togglePlay() { if (playing()) stopPlay(); else startPlay(); }
+
+  function updateControls() {
+    var R = state.run, last = R ? R.rows.length - 1 : 0;
+    $('btn-prev').disabled = !R || state.cur === 0;
+    $('btn-next').disabled = !R || state.cur === last;
+    $('btn-all').disabled = !R || state.cur === last;
+    $('btn-reset').disabled = !R || (state.cur === 0 && !playing());
+    $('btn-play').disabled = !R;
+    var p = $('btn-play');
+    p.setAttribute('aria-pressed', playing() ? 'true' : 'false');
+    p.innerHTML = playing() ? '&#10074;&#10074; Pause' : '&#9654; Play';
+  }
+
+  $('btn-prev').addEventListener('click', function () { stopPlay(); go(state.cur - 1); });
+  $('btn-next').addEventListener('click', function () { stopPlay(); go(state.cur + 1); });
+  $('btn-play').addEventListener('click', togglePlay);
+  $('btn-all').addEventListener('click', function () { stopPlay(); go(state.run.rows.length - 1); });
+  $('btn-reset').addEventListener('click', function () { stopPlay(); go(0); });
+
+  // Keyboard shortcuts on the Simulator tab (ignored while typing in an input).
+  document.addEventListener('keydown', function (e) {
+    if ($('panel-sim').hidden || !state.run || e.altKey || e.ctrlKey || e.metaKey) return;
+    var t = e.target.tagName;
+    if (t === 'INPUT' || t === 'TEXTAREA' || (t === 'BUTTON' && (e.key === ' ' || e.key === 'Enter'))) return;
+    var k = e.key, last = state.run.rows.length - 1;
+    if (k === 'ArrowRight') { stopPlay(); go(state.cur + 1); }
+    else if (k === 'ArrowLeft') { stopPlay(); go(state.cur - 1); }
+    else if (k === ' ') togglePlay();
+    else if (k === 'Home') { stopPlay(); go(0); }
+    else if (k === 'End') { stopPlay(); go(last); }
+    else return;
+    e.preventDefault();
+  });
+
+  // Presets are written in hex, so they also switch the number base to hex.
+  Array.prototype.forEach.call(document.querySelectorAll('#presets button'), function (b) {
+    b.addEventListener('click', function () {
+      inV.value = b.getAttribute('data-v');
+      document.querySelector('input[name="base"][value="hex"]').checked = true;
+      lastBase = 'hex';
+      load();
+    });
+  });
+
+  // ---------- input ----------
+  inV.addEventListener('input', load);
+  inV.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); load(); } });
+  // Switching base rewrites a valid value in the new base, so 1234 (hex) becomes 4660 and back.
+  Array.prototype.forEach.call(document.querySelectorAll('input[name="base"]'), function (r) {
+    r.addEventListener('change', function () {
+      var nb = base();
+      var p = BC.parseNumber(inV.value, lastBase);
+      if (!p.err && p.v >= 0) inV.value = nb === 'hex' ? BC.toHex(p.v, 4) : String(p.v);
+      lastBase = nb;
+      load();
+    });
+  });
+  $('inputs').addEventListener('submit', function (e) { e.preventDefault(); load(); });
+
+  // ---------- 8086 assembly tab ----------
+  function srcText(id) { return $(id).textContent.replace(/^\n/, ''); }
+  function setOf(words) { var o = {}; words.split(' ').forEach(function (w) { o[w] = 1; }); return o; }
+  var INS = setOf('mov movzx xor add adc sub shl shr rcl rol test cmp jz jnz jc jnc je jne jae jbe jmp call ret dec inc neg and or int div push pop lea loop');
+  var REG = setOf('ax bx cx dx si di al ah bl bh cl ch dl dh eax ebx ecx edx esi edi ds es ss cs sp bp');
+  var DIR = setOf('section global db dw dd resb resw resd equ .model .stack .data .code proc endp end small byte word dword @data');
+  // Small syntax highlighter for NASM/MASM: comments, strings, numbers, labels,
+  // instructions, registers and directives.
+  function highlightAsm(src) {
+    return src.split('\n').map(function (line) {
+      var q = null, cut = line.length;
+      for (var i = 0; i < line.length; i++) {
+        var c = line[i];
+        if (q) { if (c === q) q = null; }
+        else if (c === '"' || c === "'") q = c;
+        else if (c === ';') { cut = i; break; }
+      }
+      var code = line.slice(0, cut), com = line.slice(cut), out = '', last = 0, m;
+      var re = /("[^"]*"?|'[^']*'?)|(\b0x[0-9A-Fa-f]+\b|\b\d[0-9A-Fa-f]*[hH]?\b)|([A-Za-z_.@$?][\w.@$?]*:?)/g;
+      while ((m = re.exec(code))) {
+        out += esc(code.slice(last, m.index)); last = re.lastIndex;
+        var t = m[0], lw = t.toLowerCase(), cls = '';
+        if (m[1]) cls = 'str';
+        else if (m[2]) cls = 'num';
+        else if (t.slice(-1) === ':') cls = 'lbl';
+        else if (INS[lw]) cls = 'ins';
+        else if (REG[lw]) cls = 'reg';
+        else if (DIR[lw]) cls = 'dir';
+        out += cls ? '<span class="t-' + cls + '">' + esc(t) + '</span>' : esc(t);
+      }
+      out += esc(code.slice(last));
+      if (com) out += '<span class="t-com">' + esc(com) + '</span>';
+      return out;
+    }).join('\n');
+  }
+  function prog() { return document.querySelector('input[name="prog"]:checked').value; }
+  function showProg() { $('code').innerHTML = highlightAsm(srcText(prog() === 'masm' ? 'src-masm' : 'src-nasm')); $('code').scrollTop = 0; }
+  Array.prototype.forEach.call(document.querySelectorAll('input[name="prog"]'), function (r) { r.addEventListener('change', showProg); });
+  showProg();
+  $('asm-out').textContent = srcText('src-output');
+
+  function copyText(text, done) {
+    function fallback() {
+      var ta = document.createElement('textarea');
+      ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      var ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) {}
+      document.body.removeChild(ta);
+      done(ok);
+    }
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(function () { done(true); }, fallback);
+    } else fallback();
+  }
+  $('btn-copy').addEventListener('click', function () {
+    var b = $('btn-copy');
+    copyText(srcText(prog() === 'masm' ? 'src-masm' : 'src-nasm'), function (ok) {
+      b.textContent = ok ? 'Copied ✓' : 'Select the code and press Ctrl+C';
+      b.classList.toggle('done', ok);
+      setTimeout(function () { b.textContent = 'Copy code'; b.classList.remove('done'); }, 1800);
+    });
+  });
+  $('asm-preset').addEventListener('click', function () {
+    document.querySelector('#presets button.asm').click();
+    selectTab($('tab-sim'));
+    window.scrollTo(0, 0);
+  });
+
+  lastBase = base();   // the browser may restore a previously chosen base on reload
+  load();
+})();
+</script>
+</body>
+</html>

@@ -75,6 +75,17 @@
   h3 { font-size: 1rem; margin: 22px 0 8px; }
   a { color: var(--accent); }
 
+  /* ---------- page nav (shared by index.html and bitcount.html) ---------- */
+  nav.pagenav { background: var(--surface); border-bottom: 1px solid var(--line); }
+  nav.pagenav .wrap { display: flex; gap: 6px; padding-top: 8px; padding-bottom: 8px; overflow-x: auto; scrollbar-width: none; }
+  nav.pagenav a {
+    font: 600 .9rem var(--sans); color: var(--ink-2); text-decoration: none; white-space: nowrap;
+    padding: 7px 14px; border-radius: 999px; border: 1.5px solid transparent;
+  }
+  nav.pagenav a:hover { border-color: var(--line); color: var(--ink); }
+  nav.pagenav a[aria-current="page"] { background: var(--accent-soft); color: var(--accent); }
+  nav.pagenav a:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
   nav.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin: 18px 0 22px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
   nav.tabs button {
     appearance: none; border: 0; background: none; cursor: pointer;
@@ -349,6 +360,13 @@
 </style>
 </head>
 <body>
+<nav class="pagenav" aria-label="Lab problems">
+  <div class="wrap">
+    <a href="index.html" aria-current="page">Q15 Shift-and-Add Multiply</a>
+    <a href="bitcount.html">Q16 Count 1s and 0s in AX</a>
+  </div>
+</nav>
+
 <header class="top">
   <div class="wrap">
     <div>

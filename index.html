@@ -607,7 +607,39 @@
     </section>
 
     <section id="panel-vs" role="tabpanel" aria-labelledby="tab-vs" hidden>
-      <p class="card muted">Coming soon.</p>
+      <div class="card prose">
+        <h2>Shift-and-add vs Booth's algorithm</h2>
+        <h3>1. Unsigned vs signed</h3>
+        <p>Shift-and-add treats every bit pattern as an <b>unsigned</b> number. In 4 bits, <span class="mono">1111</span> is 15 here, but in two's complement the same bits mean &minus;1. So if you feed it a negative number you get the wrong answer: &minus;1 &times; 3 becomes 15 &times; 3 = 45 = <span class="mono">0010 1101</span>, while the correct signed product &minus;3 is <span class="mono">1111 1101</span>. That is why this visualizer accepts only unsigned inputs.</p>
+        <p><b>Booth's algorithm</b> works on two's complement numbers directly: it decides on the pair Q<sub>0</sub> Q<sub>&minus;1</sub>, can <i>subtract</i> M as well as add it, and uses an <i>arithmetic</i> right shift that keeps the sign. Positive and negative operands go through the same steps.</p>
+        <h3>2. Runs of 1s</h3>
+        <p>Shift-and-add needs one addition for <i>every</i> 1 in the multiplier. Booth needs one subtraction where a run of 1s starts and one addition just after it ends, however long the run is.</p>
+        <table class="mini">
+          <thead><tr><th>Multiplier (8 bits)</th><th>Shift-and-add: additions</th><th>Booth: add/sub</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">0111 1110</td><td>6</td><td>2</td></tr>
+            <tr><td class="mono">0000 1111</td><td>4</td><td>2</td></tr>
+            <tr><td class="mono">0101 0101</td><td>4</td><td>8 <span class="muted">(alternating bits: Booth is worse)</span></td></tr>
+          </tbody>
+        </table>
+        <p class="live" id="vs-live"></p>
+        <h3>3. Side by side</h3>
+        <div class="tablewrap">
+        <table class="mini">
+          <thead><tr><th></th><th>Shift-and-add (this page)</th><th>Booth's</th></tr></thead>
+          <tbody>
+            <tr><td>Numbers</td><td>unsigned</td><td>signed (two's complement)</td></tr>
+            <tr><td>Decision</td><td>Q<sub>0</sub></td><td>Q<sub>0</sub> Q<sub>&minus;1</sub></td></tr>
+            <tr><td>Operations</td><td class="add-c">add M</td><td><span class="add-c">add M</span>, <span class="sub-c">subtract M</span></td></tr>
+            <tr><td>Shift</td><td>M left, Q right (logical)</td><td>A, Q, Q<sub>&minus;1</sub> right (arithmetic)</td></tr>
+            <tr><td>Adds needed</td><td>one per 1 bit</td><td>one per start/end of a run of 1s</td></tr>
+            <tr><td>Cycles</td><td><i>n</i></td><td><i>n</i></td></tr>
+            <tr><td>Product</td><td>2<i>n</i>-bit P, never overflows</td><td>2<i>n</i>-bit A Q</td></tr>
+          </tbody>
+        </table>
+        </div>
+        <p>See signed multiplication step by step in the sibling project: <a href="https://anmol-goyal7.github.io/booths-algorithm-visualizer/" target="_blank" rel="noopener">Booth's Multiplication Algorithm Visualizer &#8599;</a></p>
+      </div>
     </section>
   </main>
 
@@ -1392,6 +1424,7 @@ Product      : 06260060H (103153760)
     state.run = SA.multiply(pm.v, pq.v, n);
     state.cur = 0;
     renderSetup();
+    renderVsLive();
     buildTable();
     render();
   }
@@ -1493,6 +1526,19 @@ Product      : 06260060H (103153760)
       '<p class="check ' + (ok ? 'ok' : 'bad') + '">Product = ' + p.value + ' = ' + R.m + ' × ' + R.q +
         (ok ? '  ✓' : '  ✗ (expected ' + expect + ')') +
         '<small>' + p.hex + 'H = ' + hexOf(R.m, n) + ' × ' + hexOf(R.q, n) + ' (checked with BigInt, outside the algorithm)</small></p>';
+  }
+
+  // Live comparison on the "Shift-add vs Booth's" tab for the multiplier currently loaded.
+  function renderVsLive() {
+    var R = state.run, q = R.Qbits, ones = 0, booth = 0;
+    for (var i = 0; i < q.length; i++) if (q[i] === '1') ones++;
+    // Booth on the same unsigned pattern: one add/sub at every 0/1 boundary of 0 Q 0
+    // (a 0 above the top bit for the unsigned value, and Q-1 = 0 below bit 0).
+    var padded = '0' + q + '0';
+    for (var k = 0; k + 1 < padded.length; k++) if (padded[k] !== padded[k + 1]) booth++;
+    $('vs-live').innerHTML = '<b>Your current multiplier</b> Q = <span class="mono">' + q + '</span> (' + R.q + '): ' +
+      'shift-and-add adds M <b>' + ones + '</b> time' + (ones === 1 ? '' : 's') + ' (once per 1 bit); ' +
+      'Booth would need <b>' + booth + '</b> add/subtract operation' + (booth === 1 ? '' : 's') + ' (once per start or end of a run of 1s).';
   }
 
   // ---------- long multiplication view ----------

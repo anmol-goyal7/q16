@@ -175,6 +175,24 @@
   .k-shift .badge, .badge.k-shift { background: var(--asr-soft); color: var(--asr); }
   .k-init .badge, .badge.k-init { background: var(--accent-soft); color: var(--accent); }
 
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+  .controls button, .presets button {
+    font: 600 .95rem var(--sans); cursor: pointer; color: var(--ink);
+    background: var(--surface); border: 1.5px solid var(--line); border-radius: 10px; padding: 10px 16px;
+  }
+  .controls button:hover:not(:disabled), .presets button:hover { border-color: var(--ink-3); }
+  .controls button:disabled { opacity: .4; cursor: default; }
+  .controls button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  [data-theme="dark"] .controls button.primary { color: #10131f; }
+
+  .presets { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
+  .presets .plabel { font-weight: 600; font-size: .9rem; color: var(--ink-2); margin-right: 4px; }
+  .presets button { padding: 7px 12px; font: 600 .95rem var(--mono); }
+  .presets button.edge { border-color: var(--pair); color: var(--pair); background: var(--pair-soft); }
+  .presets button.asm { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+  #btn-play[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--surface); }
+  .kbd-hint { align-self: center; margin-left: auto; font-size: .8rem; color: var(--ink-3); }
+
   /* ---------- table ---------- */
   .tablewrap { overflow-x: auto; margin: 0 -22px; padding: 0 22px; }
   table.steps { border-collapse: collapse; width: 100%; min-width: 560px; }
@@ -242,6 +260,7 @@
   /* ---------- responsive ---------- */
   @media (max-width: 860px) {
     .inputs { grid-template-columns: 1fr 1fr; }
+    .kbd-hint { display: none; }
   }
   @media (max-width: 560px) {
     .inputs { grid-template-columns: 1fr; gap: 10px; }
@@ -255,6 +274,8 @@
     .steps td.op, .steps td.step { white-space: normal; font-size: .85rem; line-height: 1.25; }
     .opname .long { display: none; }
     .opname .short { display: inline; }
+    .controls button { flex: 1 1 auto; padding: 10px 12px; }
+    #btn-next { flex-basis: 100%; order: -1; }
     .lmwrap { margin: 0 -16px; padding: 0 16px 4px; }
     table.lm { font-size: 1.15rem; }
     .w8 table.lm { font-size: .85rem; }
@@ -332,6 +353,16 @@
             <p class="hint" id="range-hint"></p>
           </fieldset>
         </form>
+        <div class="presets" id="presets">
+          <span class="plabel">Examples</span>
+          <button type="button" data-m="13" data-q="11" data-n="4" data-base="dec" title="The hand-worked example">13 &times; 11</button>
+          <button type="button" data-m="15" data-q="15" data-n="4" data-base="dec" title="Largest 4-bit product">15 &times; 15</button>
+          <button type="button" data-m="0" data-q="9" data-n="4" data-base="dec">0 &times; 9</button>
+          <button type="button" data-m="1" data-q="255" data-n="8" data-base="dec">1 &times; 255</button>
+          <button type="button" data-m="200" data-q="150" data-n="8" data-base="dec">200 &times; 150</button>
+          <button type="button" data-m="1234" data-q="5678" data-n="16" data-base="hex" class="asm" title="Same inputs as the assembly program">1234H &times; 5678H</button>
+          <button type="button" data-m="FFFF" data-q="FFFF" data-n="16" data-base="hex" class="edge" title="Largest 16-bit product">FFFFH &times; FFFFH</button>
+        </div>
       </div>
 
       <div id="sim-body" class="w4">
@@ -350,6 +381,14 @@
           </div>
           <div class="regs" id="regs"></div>
           <p class="opline"><span class="badge" id="op-badge"></span><span id="why"></span></p>
+          <div class="controls" id="controls">
+            <button type="button" id="btn-prev" title="Previous step (Left arrow)">&#9664; Previous</button>
+            <button type="button" id="btn-next" class="primary" title="Next step (Right arrow)">Next step &#9654;</button>
+            <button type="button" id="btn-play" title="Auto-step every 1.2 s (Space)" aria-pressed="false">&#9654; Play</button>
+            <button type="button" id="btn-all" title="Jump to the final step (End)">Run all &#9197;</button>
+            <button type="button" id="btn-reset" title="Back to the initial state (Home)">&#8634; Reset</button>
+            <span class="kbd-hint">Keys: &larr; &rarr; Space Home End</span>
+          </div>
         </div>
 
         <div class="card" id="long-card">
@@ -635,6 +674,7 @@
   // ---------- state ----------
   var state = { run: null, cur: 0, timer: null };
   var inM = $('in-m'), inQ = $('in-q');
+  var lastBase = 'dec';   // base the inputs are currently written in
 
   function width() { return +document.querySelector('input[name="n"]:checked').value; }
   function base() { return document.querySelector('input[name="base"]:checked').value; }
@@ -645,6 +685,7 @@
   }
 
   function load() {
+    stopPlay();
     var n = width(), b = base(), max = SA.range(n).max;
     $('range-hint').textContent = 'Range for ' + n + ' bits: 0 to ' + max + ' (' + hexOf(0, n) + ' to ' + hexOf(max, n) + ')';
     Array.prototype.forEach.call(document.querySelectorAll('.unit'), function (u) { u.textContent = b; });
@@ -656,9 +697,9 @@
     var ok = !pm.err && !pq.err && v.ok;
     $('sim-body').classList.toggle('invalid', !ok);
     $('invalid-msg').hidden = ok;
-    if (!ok) { state.run = null; return; }
+    if (!ok) { state.run = null; updateControls(); return; }
     state.run = SA.multiply(pm.v, pq.v, n);
-    state.cur = state.run.rows.length - 1;
+    state.cur = 0;
     renderSetup();
     buildTable();
     render();
@@ -703,7 +744,7 @@
         '<td class="b" title="Q = ' + row.qVal + '">' + bitText(row.Q) + '</td>' +
         '<td class="b" title="P = ' + row.pVal + '">' + bitText(row.P) + '</td>' +
         '<td class="b">' + row.count + '</td>';
-      tr.addEventListener('click', function () { go(i); });
+      tr.addEventListener('click', function () { stopPlay(); go(i); });
       body.appendChild(tr);
       return tr;
     });
@@ -734,9 +775,13 @@
     $('why').innerHTML = pretty(row.why);
     $('stepinfo').textContent = 'Step ' + i + ' of ' + last + (i === 0 ? '' : '  ·  cycle ' + row.cycle + ' of ' + n);
 
-    rowEls.forEach(function (tr, k) { tr.classList.toggle('current', k === i); });
+    rowEls.forEach(function (tr, k) {
+      tr.hidden = k > i;
+      tr.classList.toggle('current', k === i);
+    });
     renderLong();
     renderResult(i === last);
+    updateControls();
   }
 
   function renderResult(done) {
@@ -809,6 +854,68 @@
     state.cur = Math.max(0, Math.min(state.run.rows.length - 1, i));
     render();
   }
+  var PLAY_MS = 1200;
+  function playing() { return state.timer !== null; }
+  function stopPlay() {
+    if (state.timer !== null) { clearInterval(state.timer); state.timer = null; }
+    updateControls();
+  }
+  function startPlay() {
+    if (!state.run) return;
+    if (state.cur === state.run.rows.length - 1) go(0);   // replay from the start
+    state.timer = setInterval(function () {
+      if (state.cur >= state.run.rows.length - 1) { stopPlay(); return; }
+      go(state.cur + 1);
+      if (state.cur >= state.run.rows.length - 1) stopPlay();
+    }, PLAY_MS);
+    updateControls();
+  }
+  function togglePlay() { if (playing()) stopPlay(); else startPlay(); }
+
+  function updateControls() {
+    var R = state.run, last = R ? R.rows.length - 1 : 0;
+    $('btn-prev').disabled = !R || state.cur === 0;
+    $('btn-next').disabled = !R || state.cur === last;
+    $('btn-all').disabled = !R || state.cur === last;
+    $('btn-reset').disabled = !R || (state.cur === 0 && !playing());
+    $('btn-play').disabled = !R;
+    var p = $('btn-play');
+    p.setAttribute('aria-pressed', playing() ? 'true' : 'false');
+    p.innerHTML = playing() ? '&#10074;&#10074; Pause' : '&#9654; Play';
+  }
+
+  $('btn-prev').addEventListener('click', function () { stopPlay(); go(state.cur - 1); });
+  $('btn-next').addEventListener('click', function () { stopPlay(); go(state.cur + 1); });
+  $('btn-play').addEventListener('click', togglePlay);
+  $('btn-all').addEventListener('click', function () { stopPlay(); go(state.run.rows.length - 1); });
+  $('btn-reset').addEventListener('click', function () { stopPlay(); go(0); });
+
+  // Keyboard shortcuts on the Simulator tab (ignored while typing in an input).
+  document.addEventListener('keydown', function (e) {
+    if ($('panel-sim').hidden || !state.run || e.altKey || e.ctrlKey || e.metaKey) return;
+    var t = e.target.tagName;
+    if (t === 'INPUT' || t === 'TEXTAREA' || (t === 'BUTTON' && (e.key === ' ' || e.key === 'Enter'))) return;
+    var k = e.key, last = state.run.rows.length - 1;
+    if (k === 'ArrowRight') { stopPlay(); go(state.cur + 1); }
+    else if (k === 'ArrowLeft') { stopPlay(); go(state.cur - 1); }
+    else if (k === ' ') togglePlay();
+    else if (k === 'Home') { stopPlay(); go(0); }
+    else if (k === 'End') { stopPlay(); go(last); }
+    else return;
+    e.preventDefault();
+  });
+
+  // Presets (they also set the number base and bit width)
+  Array.prototype.forEach.call(document.querySelectorAll('#presets button'), function (b) {
+    b.addEventListener('click', function () {
+      inM.value = b.getAttribute('data-m');
+      inQ.value = b.getAttribute('data-q');
+      document.querySelector('input[name="base"][value="' + b.getAttribute('data-base') + '"]').checked = true;
+      lastBase = base();
+      document.querySelector('input[name="n"][value="' + b.getAttribute('data-n') + '"]').checked = true;
+      load();
+    });
+  });
 
   // ---------- inputs ----------
   [inM, inQ].forEach(function (el) {
@@ -816,7 +923,6 @@
     el.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); load(); } });
   });
   // Switching base rewrites valid values in the new base, so 13 becomes D and back.
-  var lastBase = base();
   Array.prototype.forEach.call(document.querySelectorAll('input[name="base"]'), function (r) {
     r.addEventListener('change', function () {
       var nb = base();
@@ -833,6 +939,7 @@
   });
   $('inputs').addEventListener('submit', function (e) { e.preventDefault(); load(); });
 
+  lastBase = base();   // the browser may restore a previously chosen base on reload
   load();
 })();
 </script>

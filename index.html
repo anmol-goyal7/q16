@@ -201,6 +201,27 @@
   .k-shift .opname { color: var(--asr); }
   .k-skip .opname { color: var(--nop); }
 
+  /* ---------- long multiplication ---------- */
+  .lm-cap { font-size: .92rem; max-width: 80ch; margin: -4px 0 14px; }
+  .lmwrap { overflow-x: auto; margin: 0 -22px; padding: 0 22px 4px; }
+  table.lm { border-collapse: collapse; font: 700 1.5rem var(--mono); margin: 0 auto 0 0; }
+  .w8 table.lm { font-size: 1.12rem; }
+  .w16 table.lm { font-size: .8rem; }
+  .lm td { padding: .08em .16em; text-align: center; line-height: 1.35; }
+  .lm td.gap { padding-left: .55em; }
+  .lm td.op { color: var(--ink-3); padding-right: .5em; }
+  .lm td.note { text-align: left; font: 500 .9rem var(--sans); color: var(--ink-2); padding-left: 1.2em; white-space: nowrap; }
+  .lm td.dot { color: var(--ink-3); font-weight: 500; }
+  .lm td.qb { color: var(--pair); background: var(--pair-soft); border-radius: 5px; }
+  .lm tr.rule td.bitc { border-top: 2px solid var(--ink-2); }
+  .lm tr.zero td.bitc, .lm tr.zero td.op { color: var(--ink-3); opacity: .55; font-weight: 500; }
+  .lm tr.zero td.note { color: var(--ink-3); }
+  .lm tr.cur td { background: var(--accent-soft); }
+  .lm tr.cur.addr td.bitc:not(.dot) { color: var(--add); }
+  .lm tr.pend td { visibility: hidden; }
+  .lm tr.sum td.bitc { color: var(--accent); }
+  .lm tr.sum.done td.note { color: var(--add); font-weight: 700; }
+
   /* ---------- result ---------- */
   .result-bits { font: 700 clamp(1.3rem, 3.6vw, 2.3rem) var(--mono); letter-spacing: .06em; color: var(--accent); overflow-wrap: anywhere; }
   .w16 .result-bits { font-size: clamp(1.05rem, 2.4vw, 1.7rem); }
@@ -234,6 +255,11 @@
     .steps td.op, .steps td.step { white-space: normal; font-size: .85rem; line-height: 1.25; }
     .opname .long { display: none; }
     .opname .short { display: inline; }
+    .lmwrap { margin: 0 -16px; padding: 0 16px 4px; }
+    table.lm { font-size: 1.15rem; }
+    .w8 table.lm { font-size: .85rem; }
+    .w16 table.lm { font-size: .62rem; }
+    .lm td.note { font-size: .78rem; }
     body { font-size: 15px; }
     .wrap { padding: 0 16px; }
     header.top { padding-top: 18px; }
@@ -324,6 +350,12 @@
           </div>
           <div class="regs" id="regs"></div>
           <p class="opline"><span class="badge" id="op-badge"></span><span id="why"></span></p>
+        </div>
+
+        <div class="card" id="long-card">
+          <h2>Long multiplication (the paper method)</h2>
+          <p class="muted lm-cap">Shift-and-add is ordinary long multiplication in base 2. Write M once for every bit of Q, shifted one place further left each time; where the Q bit is 0, write zeros instead. Adding the rows gives the product. Cycle <i>c</i> handles bit <i>c</i>&minus;1 of the original Q (after <i>c</i>&minus;1 right shifts it has become Q₀), the shifted M in the step table is exactly that row, and P is the running sum.</p>
+          <div class="lmwrap"><table class="lm" id="lm"></table></div>
         </div>
 
         <div class="card" id="table-card">
@@ -703,6 +735,7 @@
     $('stepinfo').textContent = 'Step ' + i + ' of ' + last + (i === 0 ? '' : '  ·  cycle ' + row.cycle + ' of ' + n);
 
     rowEls.forEach(function (tr, k) { tr.classList.toggle('current', k === i); });
+    renderLong();
     renderResult(i === last);
   }
 
@@ -724,6 +757,50 @@
       '<p class="check ' + (ok ? 'ok' : 'bad') + '">Product = ' + p.value + ' = ' + R.m + ' × ' + R.q +
         (ok ? '  ✓' : '  ✗ (expected ' + expect + ')') +
         '<small>' + p.hex + 'H = ' + hexOf(R.m, n) + ' × ' + hexOf(R.q, n) + ' (checked with BigInt, outside the algorithm)</small></p>';
+  }
+
+  // ---------- long multiplication view ----------
+  // Columns are bit positions 2n-1 .. 0 (left to right). Row b is M shifted left
+  // b places (or zeros when bit b of the original Q is 0), revealed in step with
+  // the trace.
+  function renderLong() {
+    var R = state.run, n = R.n, w = R.width, i = state.cur, row = R.rows[i];
+    var done = 0;                                    // cycles whose add/no-add row is reached
+    for (var k = 1; k <= i; k++) if (R.rows[k].kind === 'add' || R.rows[k].kind === 'skip') done++;
+    var curCycle = row.kind === 'add' || row.kind === 'skip' ? row.cycle : 0;
+    var qBit = curCycle ? curCycle - 1 : -1;       // original Q bit being used right now
+
+    function cells(bitsFor, extra) {               // bitsFor(pos) -> bit char, '' (blank) or '·'
+      var h = '';
+      for (var c = 0; c < w; c++) {
+        var pos = w - 1 - c, ch = bitsFor(pos), x = extra ? extra(pos) : '';
+        var cls = 'bitc' + (pos % 4 === 3 && c > 0 ? ' gap' : '') + (ch === '·' ? ' dot' : '') + (x ? ' ' + x : '');
+        h += '<td class="' + cls + '">' + ch + '</td>';
+      }
+      return h;
+    }
+    var h = '';
+    h += '<tr><td class="op"></td>' + cells(function (p) { return p < n ? R.Mbits[n - 1 - p] : ''; }) +
+         '<td class="note">M = ' + R.m + '</td></tr>';
+    h += '<tr><td class="op">×</td>' + cells(function (p) { return p < n ? R.Qbits[n - 1 - p] : ''; },
+           function (p) { return p === qBit ? 'qb' : ''; }) +
+         '<td class="note">Q = ' + R.q + (qBit >= 0 ? ' &middot; using bit ' + qBit : '') + '</td></tr>';
+    for (var b = 0; b < n; b++) {
+      var one = R.Qbits[n - 1 - b] === '1';
+      var cls = (b === 0 ? 'rule ' : '') + (one ? 'addr' : 'zero') + (b >= done ? ' pend' : '') + (b === qBit ? ' cur' : '');
+      h += '<tr class="' + cls + '"><td class="op">' + (b ? '+' : '') + '</td>' +
+        cells(function (p) {
+          if (p < b) return '·';
+          if (p > b + n - 1) return '';
+          return one ? R.Mbits[n - 1 - (p - b)] : '0';
+        }) +
+        '<td class="note">bit ' + b + ' = ' + (one ? '1 → M × 2<sup>' + b + '</sup> = ' + (R.m * Math.pow(2, b)) : '0 → 0') + '</td></tr>';
+    }
+    var last = i === R.rows.length - 1;
+    h += '<tr class="rule sum' + (last ? ' done' : '') + '"><td class="op">=</td>' +
+      cells(function (p) { return row.P[w - 1 - p]; }) +
+      '<td class="note">' + (last ? 'P = ' + row.pVal + ' = product ✓' : 'P = ' + row.pVal + ' (sum of the rows so far)') + '</td></tr>';
+    $('lm').innerHTML = h;
   }
 
   // ---------- navigation ----------

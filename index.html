@@ -89,6 +89,128 @@
   .mono { font-family: var(--mono); }
   button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
+  /* ---------- inputs ---------- */
+  .inputs { display: grid; grid-template-columns: 1fr 1fr .9fr 1.2fr; gap: 18px 22px; align-items: start; }
+  .field { margin: 0; padding: 0; border: 0; min-width: 0; }
+  .field > label, .field > legend { display: block; font-weight: 600; font-size: .9rem; margin-bottom: 6px; padding: 0; }
+  .numrow { position: relative; display: flex; }
+  input.num {
+    width: 100%; min-width: 0; font: 600 1.35rem var(--mono); color: var(--ink); text-transform: uppercase;
+    background: var(--surface); border: 1.5px solid var(--line); border-radius: 10px; padding: 9px 52px 9px 12px;
+  }
+  input.num:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  input.num[aria-invalid="true"] { border-color: var(--err); box-shadow: 0 0 0 3px var(--sub-soft); }
+  .unit { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font: 700 .78rem var(--mono); color: var(--ink-3); background: var(--surface-2); border-radius: 6px; padding: 2px 6px; pointer-events: none; }
+  .err { color: var(--err); font-size: .85rem; margin: 6px 0 0; min-height: 1.3em; }
+  .hint { color: var(--ink-3); font-size: .85rem; margin: 6px 0 0; }
+  .seg { display: flex; background: var(--surface-2); border: 1.5px solid var(--line); border-radius: 10px; padding: 3px; }
+  .seg label { flex: 1; cursor: pointer; }
+  .seg input { position: absolute; opacity: 0; pointer-events: none; }
+  .seg span { display: block; text-align: center; padding: 8px 6px; border-radius: 7px; font-weight: 600; color: var(--ink-2); white-space: nowrap; }
+  .seg input:checked + span { background: var(--surface); color: var(--accent); box-shadow: var(--shadow); }
+  .seg input:focus-visible + span { outline: 2px solid var(--accent); }
+
+  #sim-body.invalid > .card:not(.invalid-msg) { opacity: .35; pointer-events: none; filter: grayscale(.6); }
+  .invalid-msg { color: var(--err); font-weight: 600; }
+
+  /* ---------- bits ----------
+     Boxes are grouped into nibbles, and nibbles into 16-bit words. The box size
+     comes from the width of the surrounding .sized container (cqw units), so a
+     32-bit register fits on one line on a laptop and wraps per 16-bit word on a phone. */
+  .sized { container-type: inline-size; }
+  .bits { --lab: 0px; }
+  .setup .bits { --lab: 44px; }
+  .regs .bits { --lab: 150px; }
+  .bits { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; --bf: calc(var(--bw) * .6); }
+  .word, .nib { display: inline-flex; }
+  .word { gap: 6px; }
+  .nib { gap: 2px; }
+  .w4 .bits  { --bw: clamp(28px, calc((100cqw - var(--lab) - 20px) / 8), 56px); }
+  .w8 .bits  { --bw: clamp(13px, calc((100cqw - var(--lab) - 42px) / 16), 46px); }
+  .w16 .bits { --bw: clamp(14px, calc((100cqw - var(--lab) - 96px) / 32), 34px); }
+  @container (max-width: 620px) {
+    .regs .bits { --lab: 0px; }
+    .w16 .bits { --bw: clamp(12px, calc((100cqw - var(--lab) - 42px) / 16), 30px); }
+  }
+  .bit {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: var(--bw); height: calc(var(--bw) * 1.18);
+    font: 700 var(--bf) var(--mono); border-radius: calc(var(--bw) * .2);
+    background: var(--surface-2); border: 1.5px solid var(--line); color: var(--ink);
+  }
+  .bit.pair { background: var(--pair-soft); border-color: var(--pair); color: var(--pair); }
+  .bit.changed { animation: flash .7s ease-out; }
+  @keyframes flash { from { background: var(--accent-soft); border-color: var(--accent); transform: translateY(-3px); } }
+  @media (prefers-reduced-motion: reduce) { .bit.changed { animation: none; } }
+
+  /* ---------- setup ---------- */
+  .setup { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; align-items: center; }
+  .setup .k { font: 700 1.05rem var(--mono); }
+  .setup .bits { justify-content: flex-start; }
+  .w4 .setup .bits { --bw: clamp(28px, calc((100cqw - var(--lab) - 20px) / 8), 44px); }
+  .setup .note { grid-column: 2; color: var(--ink-2); font-size: .92rem; margin-bottom: 8px; }
+  .setup .note .mono { color: var(--ink); }
+  .notice { margin-top: 10px; padding: 12px 14px; border-radius: 10px; background: var(--add-soft); border-left: 4px solid var(--add); font-size: .95rem; }
+
+  /* ---------- registers ---------- */
+  .cardhead { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .stepinfo { font: 600 .9rem var(--mono); color: var(--ink-2); }
+  .regs { display: grid; grid-template-columns: 8.5rem 1fr; gap: 14px; align-items: center; padding: 6px 0 4px; }
+  .reg { display: contents; }
+  .reg .lbl { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
+  .reg .lbl b { font: 700 1.25rem var(--mono); }
+  .reg .lbl small { color: var(--ink-3); font-size: .8rem; }
+  .reg .lbl .val { font: 600 .9rem var(--mono); color: var(--ink-2); overflow-wrap: anywhere; }
+  .reg .rbits { display: flex; justify-content: flex-end; min-width: 0; }
+  .reg.adding .bit { border-color: var(--add); }
+  .reg.skipping .bits { opacity: .45; }
+  .reg.count .rbits { font: 700 1.6rem var(--mono); }
+  @container (max-width: 620px) {
+    .regs { grid-template-columns: 1fr; gap: 4px; }
+    .reg .lbl { flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; margin-top: 8px; }
+  }
+  .opline { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 16px 0 0; font-size: 1.02rem; min-height: 2.2em; }
+  .badge { font: 700 .9rem var(--mono); padding: 5px 11px; border-radius: 999px; white-space: nowrap; background: var(--nop-soft); color: var(--nop); }
+  .k-add .badge, .badge.k-add { background: var(--add-soft); color: var(--add); }
+  .k-shift .badge, .badge.k-shift { background: var(--asr-soft); color: var(--asr); }
+  .k-init .badge, .badge.k-init { background: var(--accent-soft); color: var(--accent); }
+
+  /* ---------- table ---------- */
+  .tablewrap { overflow-x: auto; margin: 0 -22px; padding: 0 22px; }
+  table.steps { border-collapse: collapse; width: 100%; min-width: 560px; }
+  .steps th { text-align: left; font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3); font-weight: 700; padding: 8px 10px; border-bottom: 1.5px solid var(--line); white-space: nowrap; }
+  .steps th sub, .steps th small { text-transform: none; }
+  .steps td { padding: 9px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  .steps td.b { font: 600 1.15rem var(--mono); letter-spacing: .06em; }
+  .w16 .steps td.b { font-size: .8rem; letter-spacing: 0; white-space: normal; line-height: 1.35; }
+  .w16 .opname .long { display: none; }
+  .w16 .opname .short { display: inline; }
+  .w16 .steps th, .w16 .steps td { padding-left: 7px; padding-right: 7px; }
+  .steps td.b .x { color: var(--ink-3); }
+  .steps td.b .tw { display: inline-block; white-space: nowrap; }
+  .steps td.step { font-weight: 700; }
+  .steps td.op { font-size: .95rem; }
+  .steps tr.k-shift td { border-bottom-width: 2px; }
+  .steps tbody tr { cursor: pointer; }
+  .steps tbody tr:hover td { background: var(--surface-2); }
+  .steps tr.current td { background: var(--accent-soft) !important; }
+  .steps tr.current td:first-child { box-shadow: inset 4px 0 0 var(--accent); }
+  .opname { font-weight: 600; }
+  .opname .short { display: none; text-decoration: none; }
+  .k-add .opname { color: var(--add); }
+  .k-shift .opname { color: var(--asr); }
+  .k-skip .opname { color: var(--nop); }
+
+  /* ---------- result ---------- */
+  .result-bits { font: 700 clamp(1.3rem, 3.6vw, 2.3rem) var(--mono); letter-spacing: .06em; color: var(--accent); overflow-wrap: anywhere; }
+  .w16 .result-bits { font-size: clamp(1.05rem, 2.4vw, 1.7rem); }
+  .result-dec { font: 700 clamp(1.2rem, 3.2vw, 1.8rem) var(--mono); margin: 6px 0 0; overflow-wrap: anywhere; }
+  .result-dec .muted { font-weight: 600; }
+  .check { margin: 12px 0 0; font: 600 1.1rem var(--mono); padding: 10px 14px; border-radius: 10px; display: inline-block; overflow-wrap: anywhere; }
+  .check.ok { background: var(--add-soft); color: var(--add); }
+  .check.bad { background: var(--sub-soft); color: var(--sub); }
+  .check small { display: block; font-weight: 500; font-size: .85em; opacity: .9; }
+
   /* ---------- theme toggle ---------- */
   .theme {
     flex: none; font: 600 .9rem var(--sans); cursor: pointer; color: var(--ink);
@@ -97,7 +219,21 @@
   .theme:hover { border-color: var(--ink-3); }
 
   /* ---------- responsive ---------- */
+  @media (max-width: 860px) {
+    .inputs { grid-template-columns: 1fr 1fr; }
+  }
   @media (max-width: 560px) {
+    .inputs { grid-template-columns: 1fr; gap: 10px; }
+    .tablewrap { margin: 0 -16px; padding: 0 16px; }
+    table.steps { min-width: 0; }
+    .steps th, .steps td, .w16 .steps th, .w16 .steps td { padding: 8px 3px; }
+    .steps th { font-size: .7rem; letter-spacing: 0; }
+    .steps td.b { letter-spacing: 0; font-size: .92rem; }
+    .w8 .steps td.b { font-size: .8rem; }
+    .w16 .steps td.b { font-size: .72rem; white-space: normal; line-height: 1.3; }
+    .steps td.op, .steps td.step { white-space: normal; font-size: .85rem; line-height: 1.25; }
+    .opname .long { display: none; }
+    .opname .short { display: inline; }
     body { font-size: 15px; }
     .wrap { padding: 0 16px; }
     header.top { padding-top: 18px; }
@@ -133,7 +269,88 @@
 
   <main>
     <section id="panel-sim" role="tabpanel" aria-labelledby="tab-sim">
-      <p class="card muted">The simulator is coming soon.</p>
+      <div class="card">
+        <h2>Inputs</h2>
+        <form id="inputs" class="inputs" novalidate autocomplete="off">
+          <div class="field">
+            <label for="in-m">Multiplicand <span class="mono">M</span></label>
+            <div class="numrow">
+              <input id="in-m" class="num" type="text" spellcheck="false" autocapitalize="characters" value="13" aria-describedby="err-m">
+              <span class="unit" aria-hidden="true">dec</span>
+            </div>
+            <p class="err" id="err-m" aria-live="polite"></p>
+          </div>
+          <div class="field">
+            <label for="in-q">Multiplier <span class="mono">Q</span></label>
+            <div class="numrow">
+              <input id="in-q" class="num" type="text" spellcheck="false" autocapitalize="characters" value="11" aria-describedby="err-q">
+              <span class="unit" aria-hidden="true">dec</span>
+            </div>
+            <p class="err" id="err-q" aria-live="polite"></p>
+          </div>
+          <fieldset class="field">
+            <legend>Number base</legend>
+            <div class="seg" role="radiogroup">
+              <label><input type="radio" name="base" value="dec" checked><span>Decimal</span></label>
+              <label><input type="radio" name="base" value="hex"><span>Hex</span></label>
+            </div>
+            <p class="hint">Unsigned only</p>
+          </fieldset>
+          <fieldset class="field">
+            <legend>Bit width <span class="mono">n</span></legend>
+            <div class="seg" role="radiogroup">
+              <label><input type="radio" name="n" value="4" checked><span>4 bits</span></label>
+              <label><input type="radio" name="n" value="8"><span>8 bits</span></label>
+              <label><input type="radio" name="n" value="16"><span>16 bits</span></label>
+            </div>
+            <p class="hint" id="range-hint"></p>
+          </fieldset>
+        </form>
+      </div>
+
+      <div id="sim-body" class="w4">
+        <p class="card invalid-msg" id="invalid-msg" hidden>Fix the highlighted input above to run the simulation.</p>
+
+        <div class="card sized" id="setup-card">
+          <h2>Binary setup</h2>
+          <div class="setup" id="setup"></div>
+          <div class="notice" id="fit-note"></div>
+        </div>
+
+        <div class="card sized" id="reg-card">
+          <div class="cardhead">
+            <h2>Registers</h2>
+            <span class="stepinfo" id="stepinfo"></span>
+          </div>
+          <div class="regs" id="regs"></div>
+          <p class="opline"><span class="badge" id="op-badge"></span><span id="why"></span></p>
+        </div>
+
+        <div class="card" id="table-card">
+          <h2>Step table</h2>
+          <div class="tablewrap">
+            <table class="steps" id="steps">
+              <thead>
+                <tr>
+                  <th>Step</th>
+                  <th>Q<sub>0</sub></th>
+                  <th>Action</th>
+                  <th id="th-m">M</th>
+                  <th id="th-q">Q</th>
+                  <th id="th-p">P</th>
+                  <th>Count</th>
+                </tr>
+              </thead>
+              <tbody id="steps-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card" id="result-card">
+          <h2>Result</h2>
+          <div id="result"></div>
+        </div>
+      </div>
     </section>
 
     <section id="panel-how" role="tabpanel" aria-labelledby="tab-how" hidden>
@@ -343,6 +560,203 @@
     setTheme(t);
     try { localStorage.setItem('shiftadd-theme', t); } catch (e) {}
   });
+
+  // ---------- helpers ----------
+  var SA = window.ShiftAdd;
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  // Pretty register names for display: Q0 -> Q₀.
+  function pretty(s) { return esc(s).replace(/Q0/g, 'Q₀'); }
+  function hexOf(v, bits) { return SA.toHex(v, bits / 4) + 'H'; }
+
+  // Bit boxes, grouped into nibbles and 16-bit words.
+  // opts: { mark: [indices to highlight], prev: string to diff against }
+  function bitBoxes(bits, opts) {
+    opts = opts || {};
+    var L = bits.length, h = '<span class="bits">';
+    for (var i = 0; i < L; i++) {
+      var left = L - i;   // bits from here to the right end, inclusive
+      if (i === 0) h += '<span class="word"><span class="nib">';
+      else if (left % 16 === 0) h += '</span></span><span class="word"><span class="nib">';
+      else if (left % 4 === 0) h += '</span><span class="nib">';
+      var c = 'bit';
+      if (opts.mark && opts.mark.indexOf(i) !== -1) c += ' pair';
+      if (opts.prev && opts.prev[i] !== bits[i]) c += ' changed';
+      h += '<span class="' + c + '">' + bits[i] + '</span>';
+    }
+    return h + '</span></span></span>';
+  }
+  // Bit text for the table: nibbles separated by a space, leading zeros greyed,
+  // each 16-bit word kept together so long registers wrap cleanly on a phone.
+  function bitText(bits) {
+    var lead = bits.indexOf('1');
+    if (lead === -1) lead = bits.length - 1;
+    var h = '<span class="tw">';
+    for (var i = 0; i < bits.length; i++) {
+      var left = bits.length - i;
+      if (i && left % 16 === 0) h += '</span> <span class="tw">';
+      else if (i && left % 4 === 0) h += ' ';
+      h += i < lead ? '<span class="x">' + bits[i] + '</span>' : bits[i];
+    }
+    return h + '</span>';
+  }
+
+  // ---------- state ----------
+  var state = { run: null, cur: 0, timer: null };
+  var inM = $('in-m'), inQ = $('in-q');
+
+  function width() { return +document.querySelector('input[name="n"]:checked').value; }
+  function base() { return document.querySelector('input[name="base"]:checked').value; }
+
+  function setErr(input, errEl, msg) {
+    errEl.textContent = msg || '';
+    if (msg) input.setAttribute('aria-invalid', 'true'); else input.removeAttribute('aria-invalid');
+  }
+
+  function load() {
+    var n = width(), b = base(), max = SA.range(n).max;
+    $('range-hint').textContent = 'Range for ' + n + ' bits: 0 to ' + max + ' (' + hexOf(0, n) + ' to ' + hexOf(max, n) + ')';
+    Array.prototype.forEach.call(document.querySelectorAll('.unit'), function (u) { u.textContent = b; });
+    $('sim-body').className = 'w' + n;
+    var pm = SA.parseNumber(inM.value, b), pq = SA.parseNumber(inQ.value, b);
+    var v = SA.validate(pm.err ? NaN : pm.v, pq.err ? NaN : pq.v, n);
+    setErr(inM, $('err-m'), pm.err || v.errors.m);
+    setErr(inQ, $('err-q'), pq.err || v.errors.q);
+    var ok = !pm.err && !pq.err && v.ok;
+    $('sim-body').classList.toggle('invalid', !ok);
+    $('invalid-msg').hidden = ok;
+    if (!ok) { state.run = null; return; }
+    state.run = SA.multiply(pm.v, pq.v, n);
+    state.cur = state.run.rows.length - 1;
+    renderSetup();
+    buildTable();
+    render();
+  }
+
+  // ---------- binary setup ----------
+  function renderSetup() {
+    var R = state.run, n = R.n, w = R.width, max = SA.range(n).max, big = max * max;
+    var h = '';
+    h += '<span class="k">M</span>' + bitBoxes(R.Mbits) +
+         '<span class="note">multiplicand = ' + R.m + ' = <span class="mono">' + hexOf(R.m, n) + '</span> (' + n + ' bits)</span>';
+    h += '<span class="k">Q</span>' + bitBoxes(R.Qbits) +
+         '<span class="note">multiplier = ' + R.q + ' = <span class="mono">' + hexOf(R.q, n) + '</span> (' + n + ' bits)</span>';
+    h += '<span class="k">P</span>' + bitBoxes(R.rows[0].P) +
+         '<span class="note">product register, starts at 0, <b>2n = ' + w + ' bits</b> wide. ' +
+         'M is also held in ' + w + ' bits so it can shift left. Count = n = ' + n + '.</span>';
+    $('setup').innerHTML = h;
+    $('fit-note').innerHTML = '<strong>No overflow is possible.</strong> The largest ' + n + '-bit &times; ' + n +
+      '-bit product is (2<sup>' + n + '</sup> &minus; 1)<sup>2</sup> = ' + max + ' &times; ' + max + ' = ' + big +
+      ' = <span class="mono">' + hexOf(big, w) + '</span>, which is less than 2<sup>' + w + '</sup> = ' + Math.pow(2, w) +
+      '. So the ' + w + '-bit P always holds the whole product, and M never loses a bit off the top when it is shifted left ' + n + ' times.';
+    $('th-m').innerHTML = 'M <small>(' + w + '-bit)</small>';
+    $('th-q').innerHTML = 'Q <small>(' + n + '-bit)</small>';
+    $('th-p').innerHTML = 'P <small>(' + w + '-bit)</small>';
+  }
+
+  // ---------- table ----------
+  var rowEls = [];
+  function buildTable() {
+    var R = state.run, body = $('steps-body');
+    body.innerHTML = '';
+    rowEls = R.rows.map(function (row, i) {
+      var tr = document.createElement('tr');
+      tr.className = 'k-' + row.kind;
+      tr.innerHTML =
+        '<td class="step">' + esc(row.label) + '</td>' +
+        '<td class="b">' + row.q0 + '</td>' +
+        '<td class="op"><span class="opname">' + (row.kind === 'shift'
+          ? '<span class="long">Shift M left, Q right</span><abbr class="short" title="Shift M left, Q right">Shift</abbr>'
+          : esc(row.action)) + '</span></td>' +
+        '<td class="b" title="M = ' + row.mVal + '">' + bitText(row.M) + '</td>' +
+        '<td class="b" title="Q = ' + row.qVal + '">' + bitText(row.Q) + '</td>' +
+        '<td class="b" title="P = ' + row.pVal + '">' + bitText(row.P) + '</td>' +
+        '<td class="b">' + row.count + '</td>';
+      tr.addEventListener('click', function () { go(i); });
+      body.appendChild(tr);
+      return tr;
+    });
+  }
+
+  // ---------- render current step ----------
+  var BADGE = { init: 'Initial', add: 'Add M', skip: 'No add', shift: 'Shift' };
+  function reg(name, desc, bits, value, bitsW, opts, cls) {
+    return '<div class="reg ' + (cls || '') + '"><div class="lbl"><b>' + name + '</b><small>' + desc + '</small>' +
+      '<span class="val">= ' + value + ' &middot; ' + hexOf(value, bitsW) + '</span></div>' +
+      '<div class="rbits">' + bitBoxes(bits, opts) + '</div></div>';
+  }
+  function render() {
+    var R = state.run;
+    if (!R) return;
+    var i = state.cur, row = R.rows[i], prev = i > 0 ? R.rows[i - 1] : null, n = R.n, w = R.width;
+    var last = R.rows.length - 1;
+    $('regs').innerHTML =
+      reg('M', 'multiplicand, shifted', row.M, row.mVal, w, { prev: prev && prev.M },
+        row.kind === 'add' ? 'adding' : row.kind === 'skip' ? 'skipping' : '') +
+      reg('Q', 'multiplier · Q₀ →', row.Q, row.qVal, n, { mark: [n - 1], prev: prev && prev.Q }) +
+      reg('P', 'product', row.P, row.pVal, w, { prev: prev && prev.P }) +
+      '<div class="reg count"><div class="lbl"><b>Count</b><small>cycles left</small></div><div class="rbits">' + row.count + '</div></div>';
+
+    var opline = $('op-badge').parentNode;
+    opline.className = 'opline k-' + row.kind;
+    $('op-badge').textContent = BADGE[row.kind];
+    $('why').innerHTML = pretty(row.why);
+    $('stepinfo').textContent = 'Step ' + i + ' of ' + last + (i === 0 ? '' : '  ·  cycle ' + row.cycle + ' of ' + n);
+
+    rowEls.forEach(function (tr, k) { tr.classList.toggle('current', k === i); });
+    renderResult(i === last);
+  }
+
+  function renderResult(done) {
+    var R = state.run, el = $('result');
+    if (!done) {
+      el.innerHTML = '<p class="muted">The product appears when Count reaches 0 (step ' + (R.rows.length - 1) + ').</p>';
+      return;
+    }
+    var p = R.product, n = R.n, w = R.width;
+    // Independent check, computed outside the core with BigInt multiplication.
+    var expect = BigInt(R.m) * BigInt(R.q);
+    var ok = BigInt(p.value) === expect;
+    var grouped = p.bits.replace(/(.{4})(?=.)/g, '$1 ');
+    el.innerHTML =
+      '<p class="muted">Product P (' + w + ' bits, unsigned)</p>' +
+      '<div class="result-bits">' + grouped + '</div>' +
+      '<p class="result-dec">= ' + p.hex + 'H <span class="muted">=</span> ' + p.value + '<sub style="font-size:.5em">10</sub></p>' +
+      '<p class="check ' + (ok ? 'ok' : 'bad') + '">Product = ' + p.value + ' = ' + R.m + ' × ' + R.q +
+        (ok ? '  ✓' : '  ✗ (expected ' + expect + ')') +
+        '<small>' + p.hex + 'H = ' + hexOf(R.m, n) + ' × ' + hexOf(R.q, n) + ' (checked with BigInt, outside the algorithm)</small></p>';
+  }
+
+  // ---------- navigation ----------
+  function go(i) {
+    if (!state.run) return;
+    state.cur = Math.max(0, Math.min(state.run.rows.length - 1, i));
+    render();
+  }
+
+  // ---------- inputs ----------
+  [inM, inQ].forEach(function (el) {
+    el.addEventListener('input', load);
+    el.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); load(); } });
+  });
+  // Switching base rewrites valid values in the new base, so 13 becomes D and back.
+  var lastBase = base();
+  Array.prototype.forEach.call(document.querySelectorAll('input[name="base"]'), function (r) {
+    r.addEventListener('change', function () {
+      var nb = base();
+      [inM, inQ].forEach(function (el) {
+        var p = SA.parseNumber(el.value, lastBase);
+        if (!p.err && p.v >= 0) el.value = nb === 'hex' ? p.v.toString(16).toUpperCase() : String(p.v);
+      });
+      lastBase = nb;
+      load();
+    });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('input[name="n"]'), function (r) {
+    r.addEventListener('change', load);
+  });
+  $('inputs').addEventListener('submit', function (e) { e.preventDefault(); load(); });
+
+  load();
 })();
 </script>
 </body>

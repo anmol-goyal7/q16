@@ -159,6 +159,148 @@
   </footer>
 </div>
 
+<!--
+  SHIFT-AND-ADD CORE: pure functions with no DOM access.
+  test.js extracts THIS script block from index.html and runs it under Node,
+  so the browser and the tests always exercise the exact same code.
+-->
+<script id="shiftadd-core">
+(function (root) {
+  'use strict';
+
+  var WIDTHS = [4, 8, 16];
+  var NEG_MSG = 'unsigned only - see Booth\'s for signed';
+
+  function pow2(k) { return Math.pow(2, k); }
+
+  // Unsigned n-bit range. Every value used here stays below 2^32, so plain
+  // JavaScript numbers are exact (they are exact up to 2^53).
+  function range(n) { return { min: 0, max: pow2(n) - 1 }; }
+
+  // Unsigned binary string of value, zero-padded to width bits.
+  function toBits(value, width) {
+    var s = value.toString(2);
+    while (s.length < width) s = '0' + s;
+    return s;
+  }
+
+  // Upper-case hex string, zero-padded to digits.
+  function toHex(value, digits) {
+    var s = value.toString(16).toUpperCase();
+    while (s.length < digits) s = '0' + s;
+    return s;
+  }
+
+  // Parse what the user typed. base is 'dec' or 'hex'.
+  // Hex accepts 1234, 1234H, 0x1234 (any case). Returns { v } or { err }.
+  // A leading minus is parsed (so validate() can explain why it is rejected).
+  function parseNumber(text, base) {
+    var s = String(text).trim().replace(/−/g, '-').replace(/[\s_]/g, '');
+    if (s === '') return { err: 'Enter a number.' };
+    var neg = false;
+    if (s[0] === '-' || s[0] === '+') { neg = s[0] === '-'; s = s.slice(1); }
+    var v;
+    if (base === 'hex') {
+      var m = /^(?:0x([0-9a-f]+)|([0-9a-f]+)h?)$/i.exec(s);
+      if (!m) return { err: 'Hex digits only (0-9, A-F), e.g. 1234 or 1234H.' };
+      v = parseInt(m[1] || m[2], 16);
+    } else {
+      if (!/^\d+$/.test(s)) return { err: 'Whole numbers only, e.g. 13 or 255.' };
+      v = parseInt(s, 10);
+    }
+    return { v: neg ? -v : v };
+  }
+
+  function isInt(v) { return typeof v === 'number' && isFinite(v) && Math.floor(v) === v; }
+
+  // Returns { ok, errors: { m?, q?, n? } }. Messages are written for the UI.
+  function validate(m, q, n) {
+    var errors = {};
+    var badN = WIDTHS.indexOf(n) === -1;
+    if (badN) errors.n = 'Bit width must be 4, 8 or 16.';
+    var r = range(badN ? 16 : n), d = (badN ? 16 : n) / 4;
+    [['m', m, 'Multiplicand'], ['q', q, 'Multiplier']].forEach(function (f) {
+      var v = f[1];
+      if (v === null || v === undefined || v === '' || (typeof v === 'number' && isNaN(v))) {
+        errors[f[0]] = 'Enter a number.';
+      } else if (!isInt(v)) {
+        errors[f[0]] = 'Whole numbers only.';
+      } else if (v < 0) {
+        errors[f[0]] = 'No negative numbers: ' + NEG_MSG + '.';
+      } else if (!badN && v > r.max) {
+        errors[f[0]] = f[2] + ' must be between 0 and ' + r.max + ' (' + toHex(0, d) + 'H to ' +
+          toHex(r.max, d) + 'H) for ' + n + ' bits.';
+      }
+    });
+    return { ok: Object.keys(errors).length === 0, errors: errors };
+  }
+
+  /*
+    Shift-and-add multiplication, textbook form (unsigned).
+      M = multiplicand (held in a 2n-bit register), Q = multiplier (n bits),
+      P = 0 (2n bits), Count = n
+      repeat n times:
+        if Q0 = 1 then P = P + M        else no add
+        shift M left by 1, shift Q right by 1 (logical), Count = Count - 1
+      P is the product.
+    P never overflows: the largest product (2^n - 1)^2 = 2^2n - 2^(n+1) + 1 < 2^2n.
+    M never loses a bit either: after n shifts it is M * 2^n < 2^2n.
+  */
+  function multiply(m, q, n) {
+    var v = validate(m, q, n);
+    if (!v.ok) {
+      var e = new Error('Invalid input: ' + JSON.stringify(v.errors));
+      e.errors = v.errors;
+      throw e;
+    }
+    var w = 2 * n;
+    var M = m, Q = q, P = 0, count = n;
+    var rows = [];
+    function row(o) {
+      o.M = toBits(M, w); o.Q = toBits(Q, n); o.P = toBits(P, w);
+      o.mVal = M; o.qVal = Q; o.pVal = P; o.count = count;
+      rows.push(o);
+    }
+
+    row({ kind: 'init', cycle: 0, label: 'Initial', q0: '', action: 'Initialise', added: 0,
+      why: 'P = 0, Count = ' + n + '. M is held in ' + w + ' bits. First look at Q0 = ' + (Q % 2) + '.' });
+
+    for (var cycle = 1; cycle <= n; cycle++) {
+      var q0 = Q % 2;
+      if (q0 === 1) {
+        P = P + M;
+        row({ kind: 'add', cycle: cycle, label: String(cycle), q0: '1', action: 'Add M', added: M,
+          why: 'Q0 = 1, so add M to P: P = ' + (P - M) + ' + ' + M + ' = ' + P + '.' });
+      } else {
+        row({ kind: 'skip', cycle: cycle, label: String(cycle), q0: '0', action: 'No add', added: 0,
+          why: 'Q0 = 0, so no add. P stays ' + P + '.' });
+      }
+      M = M * 2;                 // shift left: one place more significant
+      Q = Math.floor(Q / 2);     // logical shift right: 0 enters at the top
+      count -= 1;
+      row({ kind: 'shift', cycle: cycle, label: '', q0: '', action: 'Shift M left, Q right', added: 0,
+        why: 'Shift M left (M = ' + M + ') and Q right by one bit. Count = ' + count +
+          (count > 0 ? '. Next Q0 = ' + (Q % 2) + '.' : ', so stop. P is the product.') });
+    }
+
+    return {
+      m: m, q: q, n: n, width: w,
+      Mbits: toBits(m, n), Qbits: toBits(q, n),
+      rows: rows,
+      // P after each cycle (what the assembly program prints per step)
+      partials: rows.filter(function (r) { return r.kind === 'add' || r.kind === 'skip'; })
+        .map(function (r) { return r.pVal; }),
+      product: { bits: toBits(P, w), value: P, hex: toHex(P, w / 4) }
+    };
+  }
+
+  root.ShiftAdd = {
+    WIDTHS: WIDTHS, NEG_MSG: NEG_MSG, range: range, toBits: toBits, toHex: toHex,
+    parseNumber: parseNumber, validate: validate, multiply: multiply
+  };
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+</script>
+
 <script id="app">
 (function () {
   'use strict';

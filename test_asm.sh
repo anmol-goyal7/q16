@@ -272,6 +272,25 @@ else
   bad "count16: elf64 build/run of 1234H"
 fi
 
+# ---------------------------------------------------------------------
+# 10. The website's Q16 trace matches the assembly's per-step CF values,
+#     and the output shown on bitcount.html's 8086 tab is a real run
+# ---------------------------------------------------------------------
+build_run16 1234 elf32
+sed -nE 's/^ ?([0-9]+)   \| ([01])  \| (ONES\+\+|ZEROS\+\+)$/\1 \2 \3/p' "$BUILD/out16.txt" > "$BUILD/asm_trace16.txt"
+node test.js --trace16 4660 > "$BUILD/web_trace16.txt"
+if [ "$(wc -l < "$BUILD/asm_trace16.txt")" -eq 16 ] && cmp -s "$BUILD/asm_trace16.txt" "$BUILD/web_trace16.txt"; then
+  ok; echo "PASS  count16: website trace = assembly trace for 1234H (16 steps: CF, action)"
+else
+  bad "count16: website and assembly traces differ:"; diff "$BUILD/web_trace16.txt" "$BUILD/asm_trace16.txt"
+fi
+python3 -c "
+import re, sys
+html = open('bitcount.html', encoding='utf-8').read()
+m = re.search(r'<script type=\"text/plain\" id=\"src-output\">\n(.*?)</script>', html, re.S)
+sys.exit(0 if m and m.group(1) == open('$BUILD/out16.txt').read() else 1)
+" && { ok; echo "PASS  count16: output shown on the 8086 tab = real output of count16.asm"; } || bad "output block in bitcount.html differs from a real run"
+
 echo
 echo "$pass checks passed, $fail failed"
 [ "$fail" -eq 0 ]

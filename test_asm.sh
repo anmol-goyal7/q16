@@ -151,6 +151,17 @@ else
   bad "website and assembly traces differ:"; diff "$BUILD/web_trace.txt" "$BUILD/asm_trace.txt"
 fi
 
+# ---------------------------------------------------------------------
+# 6. The expected output shown on the website's 8086 tab is a real run
+# ---------------------------------------------------------------------
+build_run 1234 5678 elf32
+python3 -c "
+import re, sys
+html = open('index.html', encoding='utf-8').read()
+m = re.search(r'<script type=\"text/plain\" id=\"src-output\">\n(.*?)</script>', html, re.S)
+sys.exit(0 if m and m.group(1) == open('$BUILD/out.txt').read() else 1)
+" && { ok; echo "PASS  output shown on the 8086 tab = real output of mul16.asm"; } || bad "output block in index.html differs from a real run"
+
 echo
 echo "$pass checks passed, $fail failed"
 [ "$fail" -eq 0 ]

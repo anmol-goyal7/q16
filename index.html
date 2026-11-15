@@ -274,6 +274,32 @@
   .flow .e { fill: none; stroke: var(--ink-2); stroke-width: 1.8; }
   .flow .ah { fill: var(--ink-2); }
 
+  /* ---------- assembly tab ---------- */
+  .codehead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+  .codehead .seg { flex: 0 1 auto; }
+  .codehead .seg span { padding: 7px 12px; font-size: .9rem; }
+  .codebtns { display: flex; gap: 8px; flex-wrap: wrap; }
+  #btn-copy, .btnlink, .linkbtn {
+    font: 600 .9rem var(--sans); cursor: pointer; color: var(--ink); text-decoration: none;
+    background: var(--surface); border: 1.5px solid var(--line); border-radius: 10px; padding: 8px 14px; display: inline-block;
+  }
+  #btn-copy:hover, .btnlink:hover, .linkbtn:hover { border-color: var(--ink-3); }
+  #btn-copy.done { border-color: var(--add); color: var(--add); }
+  .linkbtn { color: var(--accent); }
+  pre.code {
+    margin: 0; padding: 14px 16px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px;
+    font: 500 .86rem/1.5 var(--mono); overflow: auto; max-height: 560px; tab-size: 8; color: var(--ink);
+  }
+  pre.code.out { max-height: none; font-size: .95rem; }
+  .t-com { color: var(--ink-3); font-style: italic; }
+  .t-ins { color: var(--accent); font-weight: 700; }
+  .t-reg { color: var(--pair); font-weight: 600; }
+  .t-num { color: var(--add); }
+  .t-str { color: var(--asr); }
+  .t-dir { color: var(--dir); font-weight: 600; }
+  .t-lbl { font-weight: 700; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
+  .map td.mono { white-space: nowrap; font-size: .9rem; }
+
   /* ---------- theme toggle ---------- */
   .theme {
     flex: none; font: 600 .9rem var(--sans); cursor: pointer; color: var(--ink);
@@ -301,6 +327,9 @@
     .controls button { flex: 1 1 auto; padding: 10px 12px; }
     #btn-next { flex-basis: 100%; order: -1; }
     .lmwrap { margin: 0 -16px; padding: 0 16px 4px; }
+    .codehead .seg { width: 100%; }
+    .codehead .seg span { white-space: normal; font-size: .82rem; line-height: 1.25; }
+    pre.code { font-size: .74rem; padding: 10px 12px; }
     table.lm { font-size: 1.15rem; }
     .w8 table.lm { font-size: .85rem; }
     .w16 table.lm { font-size: .62rem; }
@@ -528,7 +557,53 @@
     </section>
 
     <section id="panel-asm" role="tabpanel" aria-labelledby="tab-asm" hidden>
-      <p class="card muted">Coming soon.</p>
+      <div class="card prose">
+        <h2>8086 assembly: multiplication without MUL</h2>
+        <p>The same algorithm as the simulator, for 16-bit numbers, written with only <b>ADD/ADC</b>, <b>SHL/RCL</b>, <b>SHR</b> and <b>TEST</b>. Neither program uses <span class="mono">MUL</span> or <span class="mono">IMUL</span> anywhere, not even for printing (decimal output divides by 10 with <span class="mono">DIV</span>).</p>
+        <ul>
+          <li><b class="mono">mul16.asm</b> (NASM, 32-bit Linux): prints the inputs, a 16-line step table and the product. <b>To run it:</b> open <a href="https://onecompiler.com/assembly" target="_blank" rel="noopener">onecompiler.com/assembly</a>, delete the sample code, paste the program (use <i>Copy</i> below) and press <b>Run</b>. Change the inputs in the two <span class="mono">dw</span> lines at the top.</li>
+          <li><b class="mono">mul16_8086.asm</b> (MASM/TASM, 8086 lab-manual style): open it in <b>emu8086</b> and press <i>Emulate &rarr; Run</i>, or assemble it in DOSBox with MASM + LINK. It stores the product in <span class="mono">PROD_HI:PROD_LO</span> and prints it in hex.</li>
+        </ul>
+        <p><button type="button" class="linkbtn" id="asm-preset">Show 1234H &times; 5678H in the simulator &rarr;</button> <span class="muted">(the same 16 partial products as the program prints)</span></p>
+      </div>
+
+      <div class="card">
+        <div class="codehead">
+          <div class="seg" role="radiogroup" aria-label="Program">
+            <label><input type="radio" name="prog" value="nasm" checked><span>mul16.asm (NASM)</span></label>
+            <label><input type="radio" name="prog" value="masm"><span>mul16_8086.asm (MASM)</span></label>
+          </div>
+          <div class="codebtns">
+            <button type="button" id="btn-copy">Copy code</button>
+            <a class="btnlink" href="https://onecompiler.com/assembly" target="_blank" rel="noopener">Open OneCompiler &#8599;</a>
+          </div>
+        </div>
+        <pre class="code" id="code" tabindex="0" aria-label="Program source"></pre>
+      </div>
+
+      <div class="card">
+        <h2>Expected output of mul16.asm (default inputs 1234H &times; 5678H)</h2>
+        <p class="muted">Copied from a real run (<span class="mono">nasm -f elf32</span>, <span class="mono">ld -m elf_i386</span>). Exit code 0.</p>
+        <pre class="code out" id="asm-out"></pre>
+      </div>
+
+      <div class="card prose">
+        <h2>Which instructions do which step</h2>
+        <div class="tablewrap">
+        <table class="mini map">
+          <thead><tr><th>Algorithm step</th><th>Instructions</th><th>What happens</th></tr></thead>
+          <tbody>
+            <tr><td>P = 0, Count = 16</td><td class="mono">XOR AX,AX<br>XOR DX,DX<br>MOV CX,16</td><td>P is 32 bits, kept in <span class="mono">DX:AX</span> (high:low). Count is in CX.</td></tr>
+            <tr><td>Load M and Q</td><td class="mono">MOV SI,[num1]<br>XOR BX,BX<br>MOV DI,[num2]</td><td>M is widened to 32 bits in <span class="mono">BX:SI</span> (high word 0) so it can shift left 16 times. Q is in DI.</td></tr>
+            <tr><td>Q<sub>0</sub> = 1 ?</td><td class="mono">TEST DI,1<br>JZ skip_add</td><td>TEST ANDs without changing DI. ZF = 1 means Q<sub>0</sub> = 0, so the add is skipped.</td></tr>
+            <tr><td class="add-c">P = P + M</td><td class="mono">ADD AX,SI<br>ADC DX,BX</td><td>ADD the low words; a carry out of bit 15 goes into CF. ADC adds the high words <b>plus that carry</b>. Without ADC the carry would be lost.</td></tr>
+            <tr><td>Shift M left</td><td class="mono">SHL SI,1<br>RCL BX,1</td><td>SHL moves the top bit of SI into CF. RCL rotates CF into bit 0 of BX, so the 32-bit M doubles.</td></tr>
+            <tr><td>Shift Q right</td><td class="mono">SHR DI,1</td><td>Logical shift: a 0 enters at the top and the next multiplier bit becomes Q<sub>0</sub>.</td></tr>
+            <tr><td>Count = Count &minus; 1</td><td class="mono">DEC CX<br>JNZ next_bit</td><td>Repeat until all 16 bits are done. DX:AX is the product.</td></tr>
+          </tbody>
+        </table>
+        </div>
+      </div>
     </section>
 
     <section id="panel-vs" role="tabpanel" aria-labelledby="tab-vs" hidden>
@@ -686,6 +761,523 @@
     parseNumber: parseNumber, validate: validate, multiply: multiply
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
+</script>
+
+<!-- The assembly programs, embedded so the page works offline from file://.
+     test.js checks they are identical to mul16.asm and mul16_8086.asm, and
+     test_asm.sh checks the output block against a real run. -->
+<script type="text/plain" id="src-nasm">
+;=====================================================================
+; mul16.asm  -  16-bit x 16-bit unsigned multiplication by SHIFT-AND-ADD
+;               (the MUL / IMUL instructions are not used anywhere)
+;
+; COA Lab Problem 15: Multiply two 16-bit numbers using the shift-and-add
+;                     method instead of using the native MUL instruction.
+;
+; Assembler : NASM, 32-bit Linux (system calls through int 0x80)
+; Online    : paste this whole file into https://onecompiler.com/assembly
+;             and press Run.
+; Locally   : nasm -f elf32 mul16.asm -o mul16.o
+;             ld -m elf_i386 mul16.o -o mul16
+;             ./mul16
+;
+; Algorithm (n = 16):
+;     M = multiplicand (widened to 32 bits), Q = multiplier,
+;     P = 0 (32 bits), Count = 16
+;     repeat until Count = 0:
+;         if Q0 = 1 then P = P + M      ; 32-bit add = ADD low + ADC high
+;         shift M left by 1             ; 32-bit shift = SHL low + RCL high
+;         shift Q right by 1 (logical)  ; SHR
+;         Count = Count - 1
+;     P is the product. It always fits in 32 bits, because the largest
+;     possible product is FFFFH x FFFFH = FFFE0001H < 2^32, so it can
+;     never overflow.
+;
+; Register map of the algorithm (16-bit registers only):
+;     SI = M low word         BX = M high word      (M is in BX:SI)
+;     DI = Q (multiplier)     CX = Count
+;     AX = P low word         DX = P high word      (P is in DX:AX)
+; 32-bit registers appear only inside the print / system-call helpers
+; at the end of the file, and every helper preserves the six registers
+; above, so the algorithm never sees them change.
+;=====================================================================
+
+section .data
+    ;------------------------------------------------------------------
+    ; INPUTS: change the two numbers here (hex with an h suffix).
+    ; A value that starts with A-F needs a leading 0, e.g. 0FFFFh.
+    ;------------------------------------------------------------------
+    num1        dw 1234h            ; multiplicand M
+    num2        dw 5678h            ; multiplier   Q
+
+    ; text printed by the helpers
+    msg_title   db "Shift-and-Add Multiplication (no MUL)", 10
+    len_title   equ $ - msg_title
+    msg_mcand   db "Multiplicand : "
+    len_mcand   equ $ - msg_mcand
+    msg_mplier  db "Multiplier   : "
+    len_mplier  equ $ - msg_mplier
+    msg_head    db "Step | Q0 | Action | Partial Product", 10
+    len_head    equ $ - msg_head
+    msg_prod    db "Product      : "
+    len_prod    equ $ - msg_prod
+    msg_hopen   db "H ("                ; between the hex and decimal forms
+    len_hopen   equ $ - msg_hopen
+    msg_close   db ")", 10
+    len_close   equ $ - msg_close
+    msg_bar     db "   | "              ; after the step number
+    len_bar     equ $ - msg_bar
+    msg_add     db "  | ADD M  | "       ; after Q0 when Q0 = 1
+    len_add     equ $ - msg_add
+    msg_skip    db "  | SKIP   | "       ; after Q0 when Q0 = 0
+    len_skip    equ $ - msg_skip
+    msg_hnl     db "H", 10
+    len_hnl     equ $ - msg_hnl
+    hexdigits   db "0123456789ABCDEF"
+
+section .bss
+    numbuf      resb 12                 ; decimal digits are built here
+    hexbuf      resb 8                  ; hex digits are built here
+    save_lo     resw 1                  ; helper scratch: P low word
+    save_hi     resw 1                  ; helper scratch: P high word
+    save_q      resw 1                  ; helper scratch: Q
+    save_e      resd 1                  ; helper scratch: a 32-bit value
+
+section .text
+    global _start
+
+;=====================================================================
+; MAIN PROGRAM: the shift-and-add algorithm
+;=====================================================================
+_start:
+    ;--- print the title, both inputs and the table heading ----------
+    call    print_banner
+
+    ;--- Step 1: initialise ------------------------------------------
+    mov     si, [num1]          ; SI = M low word = multiplicand
+    xor     bx, bx              ; BX = M high word = 0 (M widened to 32 bits)
+    mov     di, [num2]          ; DI = Q = multiplier
+    xor     ax, ax              ; AX = P low word  = 0
+    xor     dx, dx              ; DX = P high word = 0
+    mov     cx, 16              ; CX = Count = n = 16 bits
+
+next_bit:
+    ;--- Step 2: test Q0, the lowest bit of the multiplier ------------
+    test    di, 1               ; ZF = 1 when Q0 = 0
+    jz      skip_add            ; Q0 = 0: no add this cycle
+
+    ;--- Step 3: Q0 = 1, so P = P + M (32-bit add on 16-bit halves) --
+    add     ax, si              ; P low  = P low  + M low, carry out -> CF
+    adc     dx, bx              ; P high = P high + M high + CF
+
+skip_add:
+    ;--- print this step: number, Q0, ADD M / SKIP, partial product ---
+    call    print_step
+
+    ;--- Step 4: shift M left by 1 (32-bit shift on 16-bit halves) ---
+    shl     si, 1               ; M low << 1, its top bit -> CF
+    rcl     bx, 1               ; M high << 1, CF -> bit 0 of M high
+
+    ;--- Step 5: shift Q right by 1 so the next bit becomes Q0 -------
+    shr     di, 1               ; logical shift: a 0 enters at the top
+
+    ;--- Step 6: Count = Count - 1, repeat until Count = 0 -----------
+    dec     cx
+    jnz     next_bit
+
+    ;--- Step 7: DX:AX now holds the 32-bit product -------------------
+    call    print_product
+    call    exit_program
+
+
+;=====================================================================
+; HELPERS (printing and system calls). These are the only places that
+; use 32-bit registers. Each public helper saves and restores the six
+; 16-bit registers of the algorithm with push/pop. (32-bit values are
+; parked in memory rather than pushed, so the file also assembles as
+; 64-bit code if an online compiler uses nasm -f elf64.)
+;=====================================================================
+
+;---------------------------------------------------------------------
+; print_banner: title, "Multiplicand : 1234H (4660)",
+;               "Multiplier   : 5678H (22136)" and the table heading.
+;---------------------------------------------------------------------
+print_banner:
+    push    ax
+    push    bx
+    push    cx
+    push    dx
+    push    si
+    push    di
+    mov     ecx, msg_title
+    mov     edx, len_title
+    call    write
+    mov     ecx, msg_mcand
+    mov     edx, len_mcand
+    call    write
+    movzx   eax, word [num1]
+    call    put_value16
+    mov     ecx, msg_mplier
+    mov     edx, len_mplier
+    call    write
+    movzx   eax, word [num2]
+    call    put_value16
+    mov     ecx, msg_head
+    mov     edx, len_head
+    call    write
+    pop     di
+    pop     si
+    pop     dx
+    pop     cx
+    pop     bx
+    pop     ax
+    ret
+
+;---------------------------------------------------------------------
+; print_step: one table line, e.g. " 4   | 1  | ADD M  | 000091A0H"
+;   in: CX = Count before it is decremented (16..1), so step = 17 - CX
+;       DI = Q (bit 0 is the Q0 tested this cycle)
+;       DX:AX = partial product P after this cycle's add
+;---------------------------------------------------------------------
+print_step:
+    push    ax
+    push    bx
+    push    cx
+    push    dx
+    push    si
+    push    di
+    mov     [save_lo], ax       ; keep P and Q, the syscalls clobber registers
+    mov     [save_hi], dx
+    mov     [save_q], di
+    ; step number, right-aligned in 2 columns
+    movzx   eax, cx
+    neg     eax
+    add     eax, 17             ; EAX = 17 - Count = step number
+    cmp     eax, 10
+    jae     .two_digits
+    mov     [save_e], eax
+    mov     ecx, msg_bar        ; a leading space (first byte of "   | ")
+    mov     edx, 1
+    call    write
+    mov     eax, [save_e]
+.two_digits:
+    call    put_dec
+    mov     ecx, msg_bar
+    mov     edx, len_bar
+    call    write
+    ; Q0 as '0' or '1', then the action
+    movzx   eax, word [save_q]
+    and     eax, 1
+    mov     [save_e], eax
+    call    put_dec
+    mov     eax, [save_e]
+    mov     ecx, msg_skip
+    mov     edx, len_skip
+    test    eax, eax
+    jz      .action
+    mov     ecx, msg_add
+    mov     edx, len_add
+.action:
+    call    write
+    ; partial product as 8 hex digits
+    movzx   eax, word [save_hi]
+    shl     eax, 16
+    mov     ax, [save_lo]       ; EAX = P = DX:AX
+    mov     ecx, 8
+    call    put_hex
+    mov     ecx, msg_hnl
+    mov     edx, len_hnl
+    call    write
+    pop     di
+    pop     si
+    pop     dx
+    pop     cx
+    pop     bx
+    pop     ax
+    ret
+
+;---------------------------------------------------------------------
+; print_product: "Product      : 06260060H (103153760)"
+;   in: DX:AX = product
+;---------------------------------------------------------------------
+print_product:
+    push    ax
+    push    bx
+    push    cx
+    push    dx
+    push    si
+    push    di
+    mov     [save_lo], ax
+    mov     [save_hi], dx
+    mov     ecx, msg_prod
+    mov     edx, len_prod
+    call    write
+    movzx   eax, word [save_hi]
+    shl     eax, 16
+    mov     ax, [save_lo]       ; EAX = DX:AX as one 32-bit value
+    mov     [save_e], eax
+    mov     ecx, 8
+    call    put_hex
+    mov     ecx, msg_hopen
+    mov     edx, len_hopen
+    call    write
+    mov     eax, [save_e]
+    call    put_dec
+    mov     ecx, msg_close
+    mov     edx, len_close
+    call    write
+    pop     di
+    pop     si
+    pop     dx
+    pop     cx
+    pop     bx
+    pop     ax
+    ret
+
+;---------------------------------------------------------------------
+; exit_program: sys_exit(0)
+;---------------------------------------------------------------------
+exit_program:
+    mov     eax, 1              ; sys_exit
+    xor     ebx, ebx            ; exit code 0
+    int     0x80
+
+;---------------------------------------------------------------------
+; Low-level helpers below may change any register; only the public
+; helpers above call them.
+;---------------------------------------------------------------------
+
+; put_value16: "XXXXH (decimal)\n" for the 16-bit value in EAX
+put_value16:
+    mov     [save_e], eax
+    mov     ecx, 4
+    call    put_hex
+    mov     ecx, msg_hopen
+    mov     edx, len_hopen
+    call    write
+    mov     eax, [save_e]
+    call    put_dec
+    mov     ecx, msg_close
+    mov     edx, len_close
+    call    write
+    ret
+
+; put_hex: print the low ECX hex digits of EAX (no MUL: shifts and a table)
+put_hex:
+    mov     edi, ecx            ; EDI = number of digits
+.digit:
+    mov     edx, eax
+    and     edx, 0Fh            ; lowest nibble
+    mov     dl, [hexdigits + edx]
+    mov     [hexbuf + ecx - 1], dl   ; fill the buffer from the right
+    shr     eax, 4
+    dec     ecx
+    jnz     .digit
+    mov     ecx, hexbuf
+    mov     edx, edi
+    call    write
+    ret
+
+; put_dec: print EAX as an unsigned decimal number (no MUL: uses DIV by 10)
+put_dec:
+    mov     edi, numbuf + 12    ; fill the buffer from the right
+    mov     ebx, 10
+.digit:
+    xor     edx, edx
+    div     ebx                 ; EAX = EAX / 10, EDX = remainder 0..9
+    add     dl, '0'
+    dec     edi
+    mov     [edi], dl
+    test    eax, eax
+    jnz     .digit
+    mov     ecx, edi            ; first digit
+    mov     edx, numbuf + 12
+    sub     edx, edi            ; number of digits
+    call    write
+    ret
+
+; write: sys_write(stdout, ECX = address, EDX = length)
+write:
+    mov     eax, 4              ; sys_write
+    mov     ebx, 1              ; file descriptor 1 = stdout
+    int     0x80
+    ret
+</script>
+<script type="text/plain" id="src-masm">
+;=====================================================================
+; MUL16_8086.ASM - 16-bit x 16-bit unsigned multiplication by the
+;                  SHIFT-AND-ADD method on the 8086 (no MUL / IMUL)
+;
+; COA Lab Problem 15: Multiply two 16-bit numbers using the shift-and-add
+;                     method instead of using the native MUL instruction.
+;
+; Assembler : MASM / TASM (DOSBox) or emu8086
+; emu8086   : File > Open this file, then Emulate > Run.
+; DOSBox    : copy it as MUL16.ASM (DOS uses 8.3 file names), then
+;               MASM MUL16.ASM;     LINK MUL16.OBJ;     MUL16
+;             or TASM MUL16.ASM     TLINK MUL16.OBJ     MUL16
+;
+; Algorithm (n = 16):
+;     M = multiplicand (widened to 32 bits in BX:SI), Q = multiplier (DI)
+;     P = 0 (32 bits in DX:AX), Count = 16 (CX)
+;     repeat until Count = 0:
+;         if Q0 = 1 then P = P + M        (ADD low words, ADC high words)
+;         shift M left 1                  (SHL low word, RCL high word)
+;         shift Q right 1 (logical)       (SHR)
+;         Count = Count - 1
+;     The 32-bit product is stored in PROD_HI:PROD_LO and printed in hex.
+;     It can never overflow: FFFFH x FFFFH = FFFE0001H fits in 32 bits.
+;
+; Expected output for the default inputs:
+;     SHIFT-AND-ADD MULTIPLICATION (NO MUL)
+;     MULTIPLICAND : 1234H
+;     MULTIPLIER   : 5678H
+;     PRODUCT      : 06260060H
+;=====================================================================
+
+.MODEL SMALL
+.STACK 100H
+
+.DATA
+    NUM1    DW 1234H                ; multiplicand M  <-- change inputs here
+    NUM2    DW 5678H                ; multiplier   Q  <-- change inputs here
+    PROD_LO DW ?                    ; product, low word
+    PROD_HI DW ?                    ; product, high word
+
+    MSG1    DB 'SHIFT-AND-ADD MULTIPLICATION (NO MUL)', 0DH, 0AH, '$'
+    MSG2    DB 'MULTIPLICAND : $'
+    MSG3    DB 'H', 0DH, 0AH, 'MULTIPLIER   : $'
+    MSG4    DB 'H', 0DH, 0AH, 'PRODUCT      : $'
+    MSG5    DB 'H', 0DH, 0AH, '$'
+
+.CODE
+MAIN PROC
+    ;--- initialise the data segment ---------------------------------
+    MOV AX, @DATA
+    MOV DS, AX
+
+    ;--- print the title and both inputs -----------------------------
+    LEA DX, MSG1
+    MOV AH, 09H                     ; DOS: print '$'-terminated string
+    INT 21H
+    LEA DX, MSG2
+    MOV AH, 09H
+    INT 21H
+    MOV BX, NUM1
+    CALL PRINT_HEX16                ; multiplicand in hex
+    LEA DX, MSG3
+    MOV AH, 09H
+    INT 21H
+    MOV BX, NUM2
+    CALL PRINT_HEX16                ; multiplier in hex
+
+    ;--- Step 1: initialise the registers ----------------------------
+    MOV SI, NUM1                    ; SI = M low word = multiplicand
+    XOR BX, BX                      ; BX = M high word = 0
+    MOV DI, NUM2                    ; DI = Q = multiplier
+    XOR AX, AX                      ; AX = P low word  = 0
+    XOR DX, DX                      ; DX = P high word = 0
+    MOV CX, 16                      ; CX = Count = 16
+
+NEXT_BIT:
+    ;--- Step 2: test Q0, the lowest bit of the multiplier ------------
+    TEST DI, 1                      ; ZF = 1 when Q0 = 0
+    JZ SKIP_ADD                     ; Q0 = 0: no add this cycle
+
+    ;--- Step 3: Q0 = 1, so P = P + M (32-bit add) -------------------
+    ADD AX, SI                      ; low words, carry out -> CF
+    ADC DX, BX                      ; high words + CF
+
+SKIP_ADD:
+    ;--- Step 4: shift M left by 1 (32-bit shift) --------------------
+    SHL SI, 1                       ; low word, top bit -> CF
+    RCL BX, 1                       ; high word, CF -> bit 0
+
+    ;--- Step 5: shift Q right by 1 so the next bit becomes Q0 -------
+    SHR DI, 1                       ; logical: 0 enters at the top
+
+    ;--- Step 6: Count = Count - 1, repeat until Count = 0 -----------
+    DEC CX
+    JNZ NEXT_BIT
+
+    ;--- Step 7: store the 32-bit product ----------------------------
+    MOV PROD_LO, AX
+    MOV PROD_HI, DX
+
+    ;--- print the product as 8 hex digits ---------------------------
+    LEA DX, MSG4
+    MOV AH, 09H
+    INT 21H
+    MOV BX, PROD_HI
+    CALL PRINT_HEX16                ; high word first
+    MOV BX, PROD_LO
+    CALL PRINT_HEX16                ; then low word
+    LEA DX, MSG5
+    MOV AH, 09H
+    INT 21H
+
+    ;--- return to DOS -----------------------------------------------
+    MOV AH, 4CH
+    INT 21H
+MAIN ENDP
+
+;---------------------------------------------------------------------
+; PRINT_HEX16: print BX as 4 hex digits with INT 21H, AH = 02H.
+; Rotates the top nibble into the bottom each time (no MUL needed).
+; All registers are preserved.
+;---------------------------------------------------------------------
+PRINT_HEX16 PROC
+    PUSH AX
+    PUSH BX
+    PUSH CX
+    PUSH DX
+    MOV CX, 4                       ; 4 hex digits
+PH_NEXT:
+    PUSH CX
+    MOV CL, 4
+    ROL BX, CL                      ; next nibble -> low 4 bits of BX
+    POP CX
+    MOV DL, BL
+    AND DL, 0FH                     ; DL = 0..15
+    CMP DL, 9
+    JBE PH_DIGIT
+    ADD DL, 7                       ; 10..15 -> 'A'..'F'
+PH_DIGIT:
+    ADD DL, '0'
+    MOV AH, 02H                     ; DOS: print the character in DL
+    INT 21H
+    LOOP PH_NEXT
+    POP DX
+    POP CX
+    POP BX
+    POP AX
+    RET
+PRINT_HEX16 ENDP
+
+END MAIN
+</script>
+<script type="text/plain" id="src-output">
+Shift-and-Add Multiplication (no MUL)
+Multiplicand : 1234H (4660)
+Multiplier   : 5678H (22136)
+Step | Q0 | Action | Partial Product
+ 1   | 0  | SKIP   | 00000000H
+ 2   | 0  | SKIP   | 00000000H
+ 3   | 0  | SKIP   | 00000000H
+ 4   | 1  | ADD M  | 000091A0H
+ 5   | 1  | ADD M  | 0001B4E0H
+ 6   | 1  | ADD M  | 0003FB60H
+ 7   | 1  | ADD M  | 00088860H
+ 8   | 0  | SKIP   | 00088860H
+ 9   | 0  | SKIP   | 00088860H
+10   | 1  | ADD M  | 002CF060H
+11   | 1  | ADD M  | 0075C060H
+12   | 0  | SKIP   | 0075C060H
+13   | 1  | ADD M  | 01990060H
+14   | 0  | SKIP   | 01990060H
+15   | 1  | ADD M  | 06260060H
+16   | 0  | SKIP   | 06260060H
+Product      : 06260060H (103153760)
 </script>
 
 <script id="app">
@@ -1037,6 +1629,75 @@
     r.addEventListener('change', load);
   });
   $('inputs').addEventListener('submit', function (e) { e.preventDefault(); load(); });
+
+  // ---------- 8086 assembly tab ----------
+  function srcText(id) { return $(id).textContent.replace(/^\n/, ''); }
+  function setOf(words) { var o = {}; words.split(' ').forEach(function (w) { o[w] = 1; }); return o; }
+  var INS = setOf('mov movzx xor add adc sub shl shr rcl rol test cmp jz jnz jae jbe jmp call ret dec inc neg and or int div push pop lea loop');
+  var REG = setOf('ax bx cx dx si di al ah bl bh cl ch dl dh eax ebx ecx edx esi edi ds es ss cs sp bp');
+  var DIR = setOf('section global db dw dd resb resw resd equ .model .stack .data .code proc endp end small byte word dword @data');
+  // Small syntax highlighter for NASM/MASM: comments, strings, numbers, labels,
+  // instructions, registers and directives.
+  function highlightAsm(src) {
+    return src.split('\n').map(function (line) {
+      var q = null, cut = line.length;
+      for (var i = 0; i < line.length; i++) {
+        var c = line[i];
+        if (q) { if (c === q) q = null; }
+        else if (c === '"' || c === "'") q = c;
+        else if (c === ';') { cut = i; break; }
+      }
+      var code = line.slice(0, cut), com = line.slice(cut), out = '', last = 0, m;
+      var re = /("[^"]*"?|'[^']*'?)|(\b0x[0-9A-Fa-f]+\b|\b\d[0-9A-Fa-f]*[hH]?\b)|([A-Za-z_.@$?][\w.@$?]*:?)/g;
+      while ((m = re.exec(code))) {
+        out += esc(code.slice(last, m.index)); last = re.lastIndex;
+        var t = m[0], lw = t.toLowerCase(), cls = '';
+        if (m[1]) cls = 'str';
+        else if (m[2]) cls = 'num';
+        else if (t.slice(-1) === ':') cls = 'lbl';
+        else if (INS[lw]) cls = 'ins';
+        else if (REG[lw]) cls = 'reg';
+        else if (DIR[lw]) cls = 'dir';
+        out += cls ? '<span class="t-' + cls + '">' + esc(t) + '</span>' : esc(t);
+      }
+      out += esc(code.slice(last));
+      if (com) out += '<span class="t-com">' + esc(com) + '</span>';
+      return out;
+    }).join('\n');
+  }
+  function prog() { return document.querySelector('input[name="prog"]:checked').value; }
+  function showProg() { $('code').innerHTML = highlightAsm(srcText(prog() === 'masm' ? 'src-masm' : 'src-nasm')); $('code').scrollTop = 0; }
+  Array.prototype.forEach.call(document.querySelectorAll('input[name="prog"]'), function (r) { r.addEventListener('change', showProg); });
+  showProg();
+  $('asm-out').textContent = srcText('src-output');
+
+  function copyText(text, done) {
+    function fallback() {
+      var ta = document.createElement('textarea');
+      ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      var ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) {}
+      document.body.removeChild(ta);
+      done(ok);
+    }
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(function () { done(true); }, fallback);
+    } else fallback();
+  }
+  $('btn-copy').addEventListener('click', function () {
+    var b = $('btn-copy');
+    copyText(srcText(prog() === 'masm' ? 'src-masm' : 'src-nasm'), function (ok) {
+      b.textContent = ok ? 'Copied ✓' : 'Select the code and press Ctrl+C';
+      b.classList.toggle('done', ok);
+      setTimeout(function () { b.textContent = 'Copy code'; b.classList.remove('done'); }, 1800);
+    });
+  });
+  $('asm-preset').addEventListener('click', function () {
+    document.querySelector('#presets button.asm').click();
+    selectTab($('tab-sim'));
+    window.scrollTo(0, 0);
+  });
 
   lastBase = base();   // the browser may restore a previously chosen base on reload
   load();

@@ -186,6 +186,15 @@ section('validation: parsing, ranges, negatives, widths', () => {
   check(threw, 'multiply throws on invalid input');
 });
 
+// ---------- the assembly shown on the 8086 tab is the real file ----------
+section('8086 tab: embedded programs match mul16.asm and mul16_8086.asm', () => {
+  for (const [id, file] of [['src-nasm', 'mul16.asm'], ['src-masm', 'mul16_8086.asm']]) {
+    const m = html.match(new RegExp(`<script type="text/plain" id="${id}">\\n([\\s\\S]*?)</script>`));
+    const disk = fs.readFileSync(path.join(__dirname, file), 'utf8');
+    check(m && m[1] === disk, `${id} in index.html differs from ${file} (re-embed the file)`);
+  }
+});
+
 console.log(`\n${passed} checks passed, ${failed} failed`);
 if (failed) {
   console.log('\nFirst failures:\n  ' + failures.join('\n  '));

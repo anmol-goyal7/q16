@@ -189,6 +189,6 @@ VIVA_NOTES.md       viva preparation notes
 
 | Name | Registration No. |
 |---|---|
-| TEAM_MEMBER_1 | REG_1 |
-| TEAM_MEMBER_2 | REG_2 |
-| TEAM_MEMBER_3 | REG_3 |
+| Anmol Goyal | RA2511033010058 |
+| Bhumika Rajput | RA2511033010016 |
+| Jiya Nambiar | RA2511033010010 |

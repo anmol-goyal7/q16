@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Interactive, offline, step-by-step visualizer for unsigned shift-and-add binary multiplication (4, 8 and 16 bits), with 8086 assembly programs.">
+<title>Shift-and-Add Multiplication Visualizer</title>
+<style>
+  :root {
+    --bg: #f6f5f1;
+    --surface: #ffffff;
+    --surface-2: #f0efe9;
+    --ink: #1c1b19;
+    --ink-2: #57544d;
+    --ink-3: #8a867c;
+    --line: #e2dfd6;
+    --accent: #3b4fd8;
+    --accent-soft: #e6e9fc;
+    --pair: #c2410c;
+    --pair-soft: #ffedd5;
+    --sub: #b42318;
+    --sub-soft: #fde8e6;
+    --add: #18794e;
+    --add-soft: #e3f5ea;
+    --nop: #6b6860;
+    --nop-soft: #efeee9;
+    --asr: #1d5fa8;
+    --asr-soft: #e3eefa;
+    --dir: #7c3aad;
+    --err: #b42318;
+    --shadow: 0 1px 2px rgba(28, 27, 25, .06), 0 4px 16px rgba(28, 27, 25, .05);
+    --radius: 14px;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace;
+  }
+  :root[data-theme="dark"] {
+    --bg: #121316;
+    --surface: #1b1d22;
+    --surface-2: #24272e;
+    --ink: #ecebe6;
+    --ink-2: #b3b0a7;
+    --ink-3: #85827a;
+    --line: #30333b;
+    --accent: #8c9bff;
+    --accent-soft: #262c52;
+    --pair: #ff9a5c;
+    --pair-soft: #3d2618;
+    --sub: #ff7b72;
+    --sub-soft: #3d1d1b;
+    --add: #4fd18b;
+    --add-soft: #16352a;
+    --nop: #a8a59c;
+    --nop-soft: #2a2c31;
+    --asr: #6cb0ff;
+    --asr-soft: #172b45;
+    --dir: #d2a8ff;
+    --err: #ff7b72;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4);
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.55 var(--sans);
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+  header.top { padding: 28px 0 8px; }
+  header.top .wrap { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+  h1 { margin: 0; font-size: clamp(1.35rem, 3.2vw, 2rem); letter-spacing: -.02em; line-height: 1.2; }
+  .sub { margin: 6px 0 0; color: var(--ink-2); }
+  h2 { font-size: 1.05rem; margin: 0 0 14px; letter-spacing: -.01em; }
+  h3 { font-size: 1rem; margin: 22px 0 8px; }
+  a { color: var(--accent); }
+
+  nav.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin: 18px 0 22px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+  nav.tabs button {
+    appearance: none; border: 0; background: none; cursor: pointer;
+    font: 600 .95rem var(--sans); color: var(--ink-2);
+    padding: 10px 14px; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap;
+  }
+  nav.tabs button[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+  nav.tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 6px; }
+
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px 22px; margin-bottom: 18px; }
+  .muted { color: var(--ink-2); }
+  .mono { font-family: var(--mono); }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* ---------- theme toggle ---------- */
+  .theme {
+    flex: none; font: 600 .9rem var(--sans); cursor: pointer; color: var(--ink);
+    background: var(--surface); border: 1.5px solid var(--line); border-radius: 999px; padding: 8px 14px; white-space: nowrap;
+  }
+  .theme:hover { border-color: var(--ink-3); }
+
+  /* ---------- responsive ---------- */
+  @media (max-width: 560px) {
+    body { font-size: 15px; }
+    .wrap { padding: 0 16px; }
+    header.top { padding-top: 18px; }
+    .sub { font-size: .9rem; }
+    .card { padding: 16px; border-radius: 12px; }
+    .theme { padding: 7px 11px; }
+    .theme .tlabel { display: none; }
+  }
+
+  footer { border-top: 1px solid var(--line); margin-top: 36px; padding: 22px 0 34px; color: var(--ink-2); font-size: .92rem; }
+  footer ul { list-style: none; padding: 0; margin: 8px 0 0; display: flex; flex-wrap: wrap; gap: 8px 28px; }
+  footer li span { font-family: var(--mono); color: var(--ink-3); margin-left: 6px; }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div>
+      <h1>Shift-and-Add Multiplication Visualizer</h1>
+      <p class="sub">Computer Organization &amp; Architecture &middot; unsigned binary multiplication without MUL, one step at a time</p>
+    </div>
+    <button type="button" class="theme" id="theme-btn" aria-pressed="false" title="Toggle dark mode"></button>
+  </div>
+</header>
+
+<div class="wrap">
+  <nav class="tabs" role="tablist" aria-label="Sections">
+    <button role="tab" id="tab-sim" aria-controls="panel-sim" aria-selected="true">Simulator</button>
+    <button role="tab" id="tab-how" aria-controls="panel-how" aria-selected="false" tabindex="-1">How it works</button>
+    <button role="tab" id="tab-asm" aria-controls="panel-asm" aria-selected="false" tabindex="-1">8086 Assembly</button>
+    <button role="tab" id="tab-vs" aria-controls="panel-vs" aria-selected="false" tabindex="-1">Shift-add vs Booth's</button>
+  </nav>
+
+  <main>
+    <section id="panel-sim" role="tabpanel" aria-labelledby="tab-sim">
+      <p class="card muted">The simulator is coming soon.</p>
+    </section>
+
+    <section id="panel-how" role="tabpanel" aria-labelledby="tab-how" hidden>
+      <p class="card muted">Coming soon.</p>
+    </section>
+
+    <section id="panel-asm" role="tabpanel" aria-labelledby="tab-asm" hidden>
+      <p class="card muted">Coming soon.</p>
+    </section>
+
+    <section id="panel-vs" role="tabpanel" aria-labelledby="tab-vs" hidden>
+      <p class="card muted">Coming soon.</p>
+    </section>
+  </main>
+
+  <footer>
+    <strong>Team</strong>
+    <ul>
+      <li>TEAM_MEMBER_1<span>REG_1</span></li>
+      <li>TEAM_MEMBER_2<span>REG_2</span></li>
+      <li>TEAM_MEMBER_3<span>REG_3</span></li>
+    </ul>
+  </footer>
+</div>
+
+<script id="app">
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+
+  // ---------- tabs ----------
+  var tabs = Array.prototype.slice.call(document.querySelectorAll('nav.tabs [role="tab"]'));
+  function selectTab(tab) {
+    tabs.forEach(function (t) {
+      var on = t === tab;
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+      t.tabIndex = on ? 0 : -1;
+      $(t.getAttribute('aria-controls')).hidden = !on;
+    });
+  }
+  tabs.forEach(function (t, i) {
+    t.addEventListener('click', function () { selectTab(t); });
+    t.addEventListener('keydown', function (e) {
+      var d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+      if (!d) return;
+      var next = tabs[(i + d + tabs.length) % tabs.length];
+      next.focus(); selectTab(next);
+    });
+  });
+
+  // ---------- theme (light by default; choice remembered per browser) ----------
+  var root = document.documentElement;
+  function setTheme(t) {
+    if (t === 'dark') root.setAttribute('data-theme', 'dark'); else root.removeAttribute('data-theme');
+    var b = $('theme-btn'), dark = t === 'dark';
+    b.setAttribute('aria-pressed', dark ? 'true' : 'false');
+    b.innerHTML = (dark ? '&#9728;' : '&#9790;') + '<span class="tlabel"> ' + (dark ? 'Light mode' : 'Dark mode') + '</span>';
+    b.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
+  }
+  var saved = null;
+  try { saved = localStorage.getItem('shiftadd-theme'); } catch (e) {}
+  setTheme(saved === 'dark' ? 'dark' : 'light');
+  $('theme-btn').addEventListener('click', function () {
+    var t = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    setTheme(t);
+    try { localStorage.setItem('shiftadd-theme', t); } catch (e) {}
+  });
+})();
+</script>
+</body>
+</html>

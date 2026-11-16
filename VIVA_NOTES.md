@@ -56,7 +56,30 @@ Both give the same counts. `ROL` (or `ROR`) saves the `PUSH`/`POP`; `SHR` is the
 
 Always **16 cycles**, whatever the value. Each cycle is one shift, one conditional jump, one increment and the `LOOP`. For an n-bit register it is n cycles.
 
-## 8 likely viva questions
+## Execution time (8086 clock cycles)
+
+Counted for the bit-counting part only (`MOV AX,NUM` to `MOV ZEROS,BH`), using Intel's 8086 instruction timings. The printing (`INT 21H`) runs DOS code and is not counted.
+
+| Instructions | Cycles | Runs |
+|---|---|---|
+| `MOV AX,NUM` | 10 | once |
+| `PUSH AX` | 11 | once |
+| `XOR BL,BL` + `XOR BH,BH` | 3 + 3 | once |
+| `MOV CX,16` | 4 | once |
+| Bit = 1: `SHR` 2 + `JNC` not taken 4 + `INC BL` 3 + `JMP` 15 | **24** | once per 1 bit |
+| Bit = 0: `SHR` 2 + `JNC` taken 16 + `INC BH` 3 | **21** | once per 0 bit |
+| `LOOP next_bit` | 17 when it jumps, 5 when it falls through | 15 × 17 + 5 = 260 |
+| `POP AX` | 8 | once |
+| `MOV ONES,BL` + `MOV ZEROS,BH` | 15 + 15 | once |
+
+**Total = 329 + 24 × ONES + 21 × ZEROS cycles.**
+
+- **1234H** (5 ones, 11 zeros): 329 + 120 + 231 = **680 cycles**, about **136 µs** on a 5 MHz 8086 (1 cycle = 0.2 µs).
+- **Fastest**, 0000H: 665 cycles (133 µs). **Slowest**, FFFFH: 713 cycles (142.6 µs).
+
+The loop always runs 16 times. The time still depends a little on the value, because a 1 bit costs 3 cycles more than a 0 bit: it takes the extra `JMP COUNTED`, while a 0 bit takes the `JNC` jump. These are textbook figures and ignore prefetch-queue and memory wait-state effects. On a modern PC, `count16.asm` takes about 0.2 ms per run, and almost all of that is Linux starting the process and printing.
+
+## 9 likely viva questions
 
 **1. Which flag is used and why?**
 The carry flag. `SHR` copies the bit it shifts out into CF, so testing CF tells us whether that bit was 1 or 0.
@@ -81,3 +104,6 @@ No. `INC` and `DEC` change the other arithmetic flags but leave CF alone. Here i
 
 **8. How would you make it faster?**
 Stop as soon as AX becomes 0 (the remaining bits are all zeros, so ZEROS = 16 − ONES), or use Kernighan's trick: `x = x AND (x − 1)` clears the lowest 1 bit, so the loop runs once per 1 bit instead of 16 times. Newer processors have a single `POPCNT` instruction; the 8086 does not.
+
+**9. How long does the program take to execute?**
+About **680 clock cycles** for 1234H, which is about **136 µs** on a 5 MHz 8086 (see *Execution time* above). In general it takes 329 + 24 × ONES + 21 × ZEROS cycles, so 665 to 713 cycles depending on the value. The loop always runs 16 times, but a 1 bit costs 3 cycles more than a 0 bit because of the extra `JMP`.

@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Interactive, offline, step-by-step visualizer for unsigned shift-and-add binary multiplication (4, 8 and 16 bits), with 8086 assembly programs.">
-<title>Shift-and-Add Multiplication Visualizer</title>
+<meta name="description" content="Interactive, offline, step-by-step visualizer that counts the 1 bits and 0 bits of the 8086 AX register by shift-and-count, with 8086 assembly programs.">
+<title>Count 1s and 0s in AX: Bit Count Visualizer</title>
 <style>
   :root {
     --bg: #f6f5f1;
@@ -75,17 +75,6 @@
   h3 { font-size: 1rem; margin: 22px 0 8px; }
   a { color: var(--accent); }
 
-  /* ---------- page nav (shared by index.html and bitcount.html) ---------- */
-  nav.pagenav { background: var(--surface); border-bottom: 1px solid var(--line); }
-  nav.pagenav .wrap { display: flex; gap: 6px; padding-top: 8px; padding-bottom: 8px; overflow-x: auto; scrollbar-width: none; }
-  nav.pagenav a {
-    font: 600 .9rem var(--sans); color: var(--ink-2); text-decoration: none; white-space: nowrap;
-    padding: 7px 14px; border-radius: 999px; border: 1.5px solid transparent;
-  }
-  nav.pagenav a:hover { border-color: var(--line); color: var(--ink); }
-  nav.pagenav a[aria-current="page"] { background: var(--accent-soft); color: var(--accent); }
-  nav.pagenav a:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-
   nav.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin: 18px 0 22px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
   nav.tabs button {
     appearance: none; border: 0; background: none; cursor: pointer;
@@ -154,15 +143,6 @@
   @keyframes flash { from { background: var(--accent-soft); border-color: var(--accent); transform: translateY(-3px); } }
   @media (prefers-reduced-motion: reduce) { .bit.changed { animation: none; } }
 
-  /* ---------- setup ---------- */
-  .setup { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; align-items: center; }
-  .setup .k { font: 700 1.05rem var(--mono); }
-  .setup .bits { justify-content: flex-start; }
-  .w4 .setup .bits { --bw: clamp(28px, calc((100cqw - var(--lab) - 20px) / 8), 44px); }
-  .setup .note { grid-column: 2; color: var(--ink-2); font-size: .92rem; margin-bottom: 8px; }
-  .setup .note .mono { color: var(--ink); }
-  .notice { margin-top: 10px; padding: 12px 14px; border-radius: 10px; background: var(--add-soft); border-left: 4px solid var(--add); font-size: .95rem; }
-
   /* ---------- registers ---------- */
   .cardhead { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
   .stepinfo { font: 600 .9rem var(--mono); color: var(--ink-2); }
@@ -229,27 +209,6 @@
   .k-add .opname { color: var(--add); }
   .k-shift .opname { color: var(--asr); }
   .k-skip .opname { color: var(--nop); }
-
-  /* ---------- long multiplication ---------- */
-  .lm-cap { font-size: .92rem; max-width: 80ch; margin: -4px 0 14px; }
-  .lmwrap { overflow-x: auto; margin: 0 -22px; padding: 0 22px 4px; }
-  table.lm { border-collapse: collapse; font: 700 1.5rem var(--mono); margin: 0 auto 0 0; }
-  .w8 table.lm { font-size: 1.12rem; }
-  .w16 table.lm { font-size: .8rem; }
-  .lm td { padding: .08em .16em; text-align: center; line-height: 1.35; }
-  .lm td.gap { padding-left: .55em; }
-  .lm td.op { color: var(--ink-3); padding-right: .5em; }
-  .lm td.note { text-align: left; font: 500 .9rem var(--sans); color: var(--ink-2); padding-left: 1.2em; white-space: nowrap; }
-  .lm td.dot { color: var(--ink-3); font-weight: 500; }
-  .lm td.qb { color: var(--pair); background: var(--pair-soft); border-radius: 5px; }
-  .lm tr.rule td.bitc { border-top: 2px solid var(--ink-2); }
-  .lm tr.zero td.bitc, .lm tr.zero td.op { color: var(--ink-3); opacity: .55; font-weight: 500; }
-  .lm tr.zero td.note { color: var(--ink-3); }
-  .lm tr.cur td { background: var(--accent-soft); }
-  .lm tr.cur.addr td.bitc:not(.dot) { color: var(--add); }
-  .lm tr.pend td { visibility: hidden; }
-  .lm tr.sum td.bitc { color: var(--accent); }
-  .lm tr.sum.done td.note { color: var(--add); font-weight: 700; }
 
   /* ---------- result ---------- */
   .result-bits { font: 700 clamp(1.3rem, 3.6vw, 2.3rem) var(--mono); letter-spacing: .06em; color: var(--accent); overflow-wrap: anywhere; }
@@ -357,21 +316,70 @@
   footer { border-top: 1px solid var(--line); margin-top: 36px; padding: 22px 0 34px; color: var(--ink-2); font-size: .92rem; }
   footer ul { list-style: none; padding: 0; margin: 8px 0 0; display: flex; flex-wrap: wrap; gap: 8px 28px; }
   footer li span { font-family: var(--mono); color: var(--ink-3); margin-left: 6px; }
+
+  /* ---------- Q16: AX register, CF and counters ---------- */
+  .inputs { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); max-width: 640px; }
+  .bc .axrow { --bw: clamp(14px, calc((100cqw - 300px) / 17), 40px); --bf: calc(var(--bw) * .6); align-items: flex-end; gap: 8px; }
+  .bc .axrow .bits { flex-wrap: nowrap; }
+  @container (max-width: 620px) {
+    .bc .axrow { --bw: clamp(11px, calc((100cqw - 54px) / 17), 30px); gap: 5px; justify-content: flex-start; }
+    .bc .axrow .bits, .bc .axrow .word { gap: 4px; }
+    .bc .axrow .nib { gap: 1px; }
+    .bc .reg .rbits.savedax { justify-content: flex-start; }
+  }
+  .arrow { font: 700 calc(var(--bw) * .7) var(--mono); color: var(--ink-3); align-self: center; padding-top: 1em; }
+  .cfwrap { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; }
+  .cfwrap small { font: 700 .75rem var(--mono); color: var(--ink-3); line-height: 1; }
+  .bit.cf.none { border-style: dashed; color: var(--ink-3); }
+  .bit.cf.one { background: var(--add-soft); border-color: var(--add); color: var(--add); }
+  .bit.cf.zero { background: var(--asr-soft); border-color: var(--asr); color: var(--asr); }
+  .bit.slide { animation: bitslide .45s ease-out; }
+  .bit.enter { animation: bitenter .45s ease-out; }
+  .bit.cf.drop { animation: cfdrop .5s ease-out; }
+  @keyframes bitslide { from { transform: translateX(calc(-1 * var(--bw) - 2px)); } }
+  @keyframes bitenter { from { opacity: 0; } }
+  @keyframes cfdrop { from { transform: translateX(calc(-1 * var(--bw) - 30px)); opacity: .25; } }
+  .savedax { align-items: baseline; gap: 12px; flex-wrap: wrap; font: 700 1.25rem var(--mono); }
+  .savedax small { font: 500 .85rem var(--mono); color: var(--ink-2); }
+  .counters, .resnums { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
+  .resnums { grid-template-columns: repeat(2, minmax(0, 220px)); margin: 12px 0 4px; }
+  .ctr { display: flex; flex-direction: column; align-items: center; padding: 10px 8px 12px; border-radius: 12px; background: var(--surface-2); border: 1.5px solid var(--line); line-height: 1.2; }
+  .ctr small { font: 700 .8rem var(--mono); letter-spacing: .06em; color: var(--ink-2); }
+  .ctr b { font: 700 clamp(2rem, 7vw, 3.2rem)/1.1 var(--mono); }
+  .ctr span { font-size: .8rem; color: var(--ink-3); text-align: center; }
+  .ctr.ones { background: var(--add-soft); border-color: var(--add); }
+  .ctr.ones b, .ctr.ones small { color: var(--add); }
+  .ctr.zeros { background: var(--asr-soft); border-color: var(--asr); }
+  .ctr.zeros b, .ctr.zeros small { color: var(--asr); }
+  .ctr.tick b { animation: tick .5s ease-out; }
+  @keyframes tick { from { transform: scale(1.5); } }
+  @media (prefers-reduced-motion: reduce) { .bit.slide, .bit.enter, .bit.cf.drop, .ctr.tick b { animation: none; } }
+  .inv { margin: 12px 0 0; font-size: .95rem; color: var(--ink-2); }
+  .inv b { color: var(--ink); }
+  .k-one .badge { background: var(--add-soft); color: var(--add); }
+  .k-zero .badge { background: var(--asr-soft); color: var(--asr); }
+  .k-one .opname { color: var(--add); }
+  .k-zero .opname { color: var(--asr); }
+  .zero-c { color: var(--asr); font-weight: 700; }
+  .bc .steps td.b { font-size: 1.05rem; }
+  .bc .steps td.b .tw { white-space: nowrap; }
+  @media (max-width: 560px) {
+    .bc .steps td.b { font-size: .58rem; letter-spacing: 0; }
+    .bc .steps td.op, .bc .steps td.step { white-space: nowrap; font-size: .68rem; }
+    .bc .steps th { font-size: .58rem; }
+    .bc .steps th, .bc .steps td { padding-left: 2px; padding-right: 2px; }
+    .bc .steps th small { display: none; }
+    .counters { gap: 8px; }
+    .ctr span { font-size: .72rem; }
+  }
 </style>
 </head>
 <body>
-<nav class="pagenav" aria-label="Lab problems">
-  <div class="wrap">
-    <a href="index.html" aria-current="page">Q15 Shift-and-Add Multiply</a>
-    <a href="bitcount.html">Q16 Count 1s and 0s in AX</a>
-  </div>
-</nav>
-
 <header class="top">
   <div class="wrap">
     <div>
-      <h1>Shift-and-Add Multiplication Visualizer</h1>
-      <p class="sub">Computer Organization &amp; Architecture &middot; unsigned binary multiplication without MUL, one step at a time</p>
+      <h1>Count 1s and 0s in AX: Bit Count Visualizer</h1>
+      <p class="sub">Computer Organization &amp; Architecture &middot; shift-and-count on the 8086 AX register, one bit at a time</p>
     </div>
     <button type="button" class="theme" id="theme-btn" aria-pressed="false" title="Toggle dark mode"></button>
   </div>
@@ -382,68 +390,44 @@
     <button role="tab" id="tab-sim" aria-controls="panel-sim" aria-selected="true">Simulator</button>
     <button role="tab" id="tab-how" aria-controls="panel-how" aria-selected="false" tabindex="-1">How it works</button>
     <button role="tab" id="tab-asm" aria-controls="panel-asm" aria-selected="false" tabindex="-1">8086 Assembly</button>
-    <button role="tab" id="tab-vs" aria-controls="panel-vs" aria-selected="false" tabindex="-1">Shift-add vs Booth's</button>
+    <button role="tab" id="tab-other" aria-controls="panel-other" aria-selected="false" tabindex="-1">Other methods</button>
   </nav>
 
   <main>
     <section id="panel-sim" role="tabpanel" aria-labelledby="tab-sim">
       <div class="card">
-        <h2>Inputs</h2>
+        <h2>Input</h2>
         <form id="inputs" class="inputs" novalidate autocomplete="off">
           <div class="field">
-            <label for="in-m">Multiplicand <span class="mono">M</span></label>
+            <label for="in-v">Value loaded into <span class="mono">AX</span></label>
             <div class="numrow">
-              <input id="in-m" class="num" type="text" spellcheck="false" autocapitalize="characters" value="13" aria-describedby="err-m">
-              <span class="unit" aria-hidden="true">dec</span>
+              <input id="in-v" class="num" type="text" spellcheck="false" autocapitalize="characters" value="1234" aria-describedby="err-v">
+              <span class="unit" aria-hidden="true">hex</span>
             </div>
-            <p class="err" id="err-m" aria-live="polite"></p>
-          </div>
-          <div class="field">
-            <label for="in-q">Multiplier <span class="mono">Q</span></label>
-            <div class="numrow">
-              <input id="in-q" class="num" type="text" spellcheck="false" autocapitalize="characters" value="11" aria-describedby="err-q">
-              <span class="unit" aria-hidden="true">dec</span>
-            </div>
-            <p class="err" id="err-q" aria-live="polite"></p>
+            <p class="err" id="err-v" aria-live="polite"></p>
           </div>
           <fieldset class="field">
             <legend>Number base</legend>
             <div class="seg" role="radiogroup">
-              <label><input type="radio" name="base" value="dec" checked><span>Decimal</span></label>
-              <label><input type="radio" name="base" value="hex"><span>Hex</span></label>
+              <label><input type="radio" name="base" value="hex" checked><span>Hex</span></label>
+              <label><input type="radio" name="base" value="dec"><span>Decimal</span></label>
             </div>
-            <p class="hint">Unsigned only</p>
-          </fieldset>
-          <fieldset class="field">
-            <legend>Bit width <span class="mono">n</span></legend>
-            <div class="seg" role="radiogroup">
-              <label><input type="radio" name="n" value="4" checked><span>4 bits</span></label>
-              <label><input type="radio" name="n" value="8"><span>8 bits</span></label>
-              <label><input type="radio" name="n" value="16"><span>16 bits</span></label>
-            </div>
-            <p class="hint" id="range-hint"></p>
+            <p class="hint">16 bits: 0 to 65535 (0000H to FFFFH)</p>
           </fieldset>
         </form>
         <div class="presets" id="presets">
           <span class="plabel">Examples</span>
-          <button type="button" data-m="13" data-q="11" data-n="4" data-base="dec" title="The hand-worked example">13 &times; 11</button>
-          <button type="button" data-m="15" data-q="15" data-n="4" data-base="dec" title="Largest 4-bit product">15 &times; 15</button>
-          <button type="button" data-m="0" data-q="9" data-n="4" data-base="dec">0 &times; 9</button>
-          <button type="button" data-m="1" data-q="255" data-n="8" data-base="dec">1 &times; 255</button>
-          <button type="button" data-m="200" data-q="150" data-n="8" data-base="dec">200 &times; 150</button>
-          <button type="button" data-m="1234" data-q="5678" data-n="16" data-base="hex" class="asm" title="Same inputs as the assembly program">1234H &times; 5678H</button>
-          <button type="button" data-m="FFFF" data-q="FFFF" data-n="16" data-base="hex" class="edge" title="Largest 16-bit product">FFFFH &times; FFFFH</button>
+          <button type="button" data-v="0000" title="All zeros: ZEROS = 16">0000H</button>
+          <button type="button" data-v="FFFF" class="edge" title="All ones: ONES = 16">FFFFH</button>
+          <button type="button" data-v="AAAA" title="Alternating bits: 8 and 8">AAAAH</button>
+          <button type="button" data-v="8001" title="Only the two edge bits are 1">8001H</button>
+          <button type="button" data-v="00FF" title="Low byte all ones">00FFH</button>
+          <button type="button" data-v="1234" class="asm" title="The default input of count16.asm">1234H (assembly default)</button>
         </div>
       </div>
 
-      <div id="sim-body" class="w4">
+      <div id="sim-body" class="bc">
         <p class="card invalid-msg" id="invalid-msg" hidden>Fix the highlighted input above to run the simulation.</p>
-
-        <div class="card sized" id="setup-card">
-          <h2>Binary setup</h2>
-          <div class="setup" id="setup"></div>
-          <div class="notice" id="fit-note"></div>
-        </div>
 
         <div class="card sized" id="reg-card">
           <div class="cardhead">
@@ -451,6 +435,8 @@
             <span class="stepinfo" id="stepinfo"></span>
           </div>
           <div class="regs" id="regs"></div>
+          <div class="counters" id="counters"></div>
+          <p class="inv" id="inv"></p>
           <p class="opline"><span class="badge" id="op-badge"></span><span id="why"></span></p>
           <div class="controls" id="controls">
             <button type="button" id="btn-prev" title="Previous step (Left arrow)">&#9664; Previous</button>
@@ -462,12 +448,6 @@
           </div>
         </div>
 
-        <div class="card" id="long-card">
-          <h2>Long multiplication (the paper method)</h2>
-          <p class="muted lm-cap">Shift-and-add is ordinary long multiplication in base 2. Write M once for every bit of Q, shifted one place further left each time; where the Q bit is 0, write zeros instead. Adding the rows gives the product. Cycle <i>c</i> handles bit <i>c</i>&minus;1 of the original Q (after <i>c</i>&minus;1 right shifts it has become Q₀), the shifted M in the step table is exactly that row, and P is the running sum.</p>
-          <div class="lmwrap"><table class="lm" id="lm"></table></div>
-        </div>
-
         <div class="card" id="table-card">
           <h2>Step table</h2>
           <div class="tablewrap">
@@ -475,11 +455,11 @@
               <thead>
                 <tr>
                   <th>Step</th>
-                  <th>Q<sub>0</sub></th>
+                  <th>AX <small>(binary)</small></th>
+                  <th>CF</th>
                   <th>Action</th>
-                  <th id="th-m">M</th>
-                  <th id="th-q">Q</th>
-                  <th id="th-p">P</th>
+                  <th>ONES</th>
+                  <th>ZEROS</th>
                   <th>Count</th>
                 </tr>
               </thead>
@@ -497,32 +477,31 @@
 
     <section id="panel-how" role="tabpanel" aria-labelledby="tab-how" hidden>
       <div class="card prose">
-        <h2>How shift-and-add multiplication works</h2>
-        <p>Shift-and-add is the long multiplication you learned at school, done in base 2. In base 2 every digit of the multiplier is 0 or 1, so each row of the paper method is either <b>M itself</b> (shifted) or <b>all zeros</b>. A processor without a multiply instruction can therefore multiply using only <b>add</b> and <b>shift</b>.</p>
-        <p>It uses these registers for n-bit unsigned operands:</p>
+        <h2>How shift-and-count works</h2>
+        <p>The 8086 has no instruction that counts bits, so the program looks at the 16 bits of <b class="mono">AX</b> <b>one at a time</b>. The trick is the <b>carry flag</b>: <span class="mono">SHR AX,1</span> moves every bit one place to the right, puts a 0 in at the top, and the bit that falls off the bottom (bit 0) lands in <b class="mono">CF</b>. A conditional jump then tests CF and one of two counters goes up.</p>
         <ul>
-          <li><b class="mono">M</b>: the multiplicand, held in a <b>2n-bit</b> register so it can be shifted left n times without losing bits.</li>
-          <li><b class="mono">Q</b>: the multiplier (n bits). Its lowest bit <b class="mono">Q₀</b> decides each step, and it is shifted right so the next bit becomes Q₀.</li>
-          <li><b class="mono">P</b>: the product (2n bits), starts at 0.</li>
-          <li><b class="mono">Count</b>: starts at <i>n</i>, one cycle per multiplier bit.</li>
+          <li><b class="mono">AX</b>: the 16-bit value. It is shifted right once per cycle, so it is <b>destroyed</b> (it ends as 0000H). The original is saved first with <span class="mono">PUSH AX</span> and restored afterwards with <span class="mono">POP AX</span>.</li>
+          <li><b class="mono">CF</b>: the carry flag. After each shift it holds the bit that was just shifted out.</li>
+          <li><b class="mono">ONES</b> and <b class="mono">ZEROS</b>: the two counters, both start at 0.</li>
+          <li><b class="mono">Count</b>: starts at 16, one cycle per bit.</li>
         </ul>
         <p>Every cycle does the same three things:</p>
         <table class="mini">
-          <thead><tr><th>Q₀</th><th>Action</th><th>Then</th></tr></thead>
+          <thead><tr><th>After SHR AX,1</th><th>Action</th><th>Then</th></tr></thead>
           <tbody>
-            <tr><td class="mono">1</td><td class="mono add-c">P = P + M</td><td rowspan="2">shift M left 1 (M &times; 2), shift Q right 1 (logical), Count = Count &minus; 1</td></tr>
-            <tr><td class="mono">0</td><td>no add</td></tr>
+            <tr><td class="mono">CF = 1</td><td class="mono add-c">ONES = ONES + 1</td><td rowspan="2">Count = Count &minus; 1, repeat until Count = 0</td></tr>
+            <tr><td class="mono">CF = 0</td><td class="mono zero-c">ZEROS = ZEROS + 1</td></tr>
           </tbody>
         </table>
-        <p>After <i>n</i> cycles Count = 0 and <b class="mono">P</b> holds the product. In cycle <i>c</i>, M has been doubled <i>c</i> &minus; 1 times, so it equals M &times; 2<sup><i>c</i>&minus;1</sup>, which is exactly the weight of bit <i>c</i> &minus; 1 of the multiplier. Adding it whenever that bit is 1 gives <span class="mono">P = &Sigma; q<sub>i</sub> &middot; M &middot; 2<sup>i</sup> = M &times; Q</span>.</p>
-        <p><b>Example, 13 &times; 11 at 4 bits:</b> Q = <span class="mono">1011</span>. Bits 0, 1 and 3 are 1, so P = 13 + 26 + 104 = <b>143</b> (bit 2 is 0, so 52 is skipped).</p>
-        <p><b>Why it never overflows:</b> the largest n-bit number is 2<sup>n</sup> &minus; 1, and (2<sup>n</sup> &minus; 1)<sup>2</sup> = 2<sup>2n</sup> &minus; 2<sup>n+1</sup> + 1, which is less than 2<sup>2n</sup>. So a 2n-bit P always holds the whole product. In 8086 assembly, P is 32 bits split over two 16-bit registers, so each 32-bit add is <span class="mono">ADD</span> (low words) followed by <span class="mono">ADC</span> (high words plus the carry).</p>
+        <p><b>Invariant:</b> each cycle adds 1 to exactly one counter, so after <i>k</i> cycles ONES + ZEROS = <i>k</i>, and at the end <b>ONES + ZEROS = 16</b>. This also means ZEROS = 16 &minus; ONES, so one counter would be enough; the program keeps both because the problem asks for both.</p>
+        <p><b>Example, AX = 1234H</b> = <span class="mono">0001 0010 0011 0100</span>. Reading from the right, the bits that drop into CF are 0, 0, 1, 0, 1, 1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0. Five of them are 1, so ONES = <b>5</b> and ZEROS = <b>11</b>.</p>
+        <p><b>Why a logical shift:</b> <span class="mono">SHR</span> always brings a 0 in at the top, so after 16 shifts every original bit has passed through CF exactly once and AX is 0. An arithmetic shift (<span class="mono">SAR</span>) would copy the sign bit back in, which does not matter for the count (only the bit going out is counted) but leaves AX as FFFFH instead of 0000H for negative values.</p>
       </div>
 
       <div class="card">
         <h2>Flowchart</h2>
-        <svg class="flow" viewBox="0 0 640 800" role="img" aria-labelledby="fc-title">
-          <title id="fc-title">Flowchart: start, initialise P = 0 and Count = n, check whether Q0 = 1, if yes add M to P, shift M left and Q right, decrement Count, repeat until Count is 0, end.</title>
+        <svg class="flow" viewBox="0 0 640 836" role="img" aria-labelledby="fc-title">
+          <title id="fc-title">Flowchart: start, save AX and set ONES = 0, ZEROS = 0, Count = 16, shift AX right by one so bit 0 goes into CF, if CF = 1 increment ONES otherwise increment ZEROS, decrement Count, repeat until Count is 0, restore AX, end.</title>
           <defs>
             <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
               <path d="M0,0 L10,5 L0,10 z" class="ah"/>
@@ -532,19 +511,22 @@
           <rect class="n term" x="250" y="16" width="140" height="44" rx="22"/>
           <text x="320" y="44">Start</text>
 
-          <rect class="n" x="190" y="92" width="260" height="64" rx="8"/>
-          <text x="320" y="118">P = 0,  Count = n</text>
-          <text x="320" y="142" class="small">load M (2n bits) and Q (n bits)</text>
+          <rect class="n" x="160" y="92" width="320" height="64" rx="8"/>
+          <text x="320" y="118">ONES = 0, ZEROS = 0, Count = 16</text>
+          <text x="320" y="142" class="small">save the original AX first (PUSH AX)</text>
 
-          <polygon class="n dec" points="320,196 420,248 320,300 220,248"/>
-          <text x="320" y="254">Q₀ = 1 ?</text>
+          <rect class="n asrn" x="190" y="196" width="260" height="64" rx="8"/>
+          <text x="320" y="222">SHR AX, 1</text>
+          <text x="320" y="246" class="small">bit 0 &#8594; CF, a 0 enters at the top</text>
 
-          <rect class="n addn" x="445" y="330" width="170" height="50" rx="8"/>
-          <text x="530" y="361">P = P + M</text>
+          <polygon class="n dec" points="320,300 420,352 320,404 220,352"/>
+          <text x="320" y="358">CF = 1 ?</text>
 
-          <rect class="n asrn" x="190" y="452" width="260" height="64" rx="8"/>
-          <text x="320" y="478">Shift M left, Q right</text>
-          <text x="320" y="502" class="small">M = 2M,  Q = Q / 2 (logical)</text>
+          <rect class="n addn" x="445" y="420" width="170" height="50" rx="8"/>
+          <text x="530" y="451">ONES++</text>
+
+          <rect class="n asrn" x="40" y="420" width="160" height="50" rx="8"/>
+          <text x="120" y="451">ZEROS++</text>
 
           <rect class="n" x="210" y="548" width="220" height="46" rx="8"/>
           <text x="320" y="577">Count = Count − 1</text>
@@ -552,23 +534,25 @@
           <polygon class="n dec" points="320,628 420,676 320,724 220,676"/>
           <text x="320" y="682">Count = 0 ?</text>
 
-          <rect class="n term" x="200" y="748" width="240" height="44" rx="22"/>
-          <text x="320" y="776">End: product = P</text>
+          <rect class="n term" x="160" y="758" width="320" height="62" rx="31"/>
+          <text x="320" y="785">End: restore AX (POP AX)</text>
+          <text x="320" y="806" class="small">ONES and ZEROS hold the two counts</text>
 
           <!-- edges -->
           <path class="e" d="M320,60 V90" marker-end="url(#arr)"/>
           <path class="e" d="M320,156 V194" marker-end="url(#arr)"/>
-          <path class="e" d="M420,248 H530 V328" marker-end="url(#arr)"/>
-          <text x="470" y="240" class="lbl">Yes</text>
-          <path class="e" d="M320,300 V450" marker-end="url(#arr)"/>
-          <text x="332" y="370" class="lbl" text-anchor="start">No</text>
-          <text x="332" y="390" class="small" text-anchor="start">(skip the add)</text>
-          <path class="e" d="M530,380 V420 H320"/>
-          <path class="e" d="M320,516 V546" marker-end="url(#arr)"/>
+          <path class="e" d="M320,260 V298" marker-end="url(#arr)"/>
+          <path class="e" d="M420,352 H530 V418" marker-end="url(#arr)"/>
+          <text x="470" y="344" class="lbl">Yes</text>
+          <path class="e" d="M220,352 H120 V418" marker-end="url(#arr)"/>
+          <text x="172" y="344" class="lbl">No</text>
+          <path class="e" d="M530,470 V510 H320"/>
+          <path class="e" d="M120,470 V510 H320"/>
+          <path class="e" d="M320,510 V546" marker-end="url(#arr)"/>
           <path class="e" d="M320,594 V626" marker-end="url(#arr)"/>
-          <path class="e" d="M320,724 V746" marker-end="url(#arr)"/>
-          <text x="334" y="741" class="lbl" text-anchor="start">Yes</text>
-          <path class="e" d="M220,676 H18 V176 H318" marker-end="url(#arr)"/>
+          <path class="e" d="M320,724 V756" marker-end="url(#arr)"/>
+          <text x="334" y="745" class="lbl" text-anchor="start">Yes</text>
+          <path class="e" d="M220,676 H12 V176 H318" marker-end="url(#arr)"/>
           <text x="196" y="666" class="lbl">No</text>
         </svg>
       </div>
@@ -576,20 +560,20 @@
 
     <section id="panel-asm" role="tabpanel" aria-labelledby="tab-asm" hidden>
       <div class="card prose">
-        <h2>8086 assembly: multiplication without MUL</h2>
-        <p>The same algorithm as the simulator, for 16-bit numbers, written with only <b>ADD/ADC</b>, <b>SHL/RCL</b>, <b>SHR</b> and <b>TEST</b>. Neither program uses <span class="mono">MUL</span> or <span class="mono">IMUL</span> anywhere, not even for printing (decimal output divides by 10 with <span class="mono">DIV</span>).</p>
+        <h2>8086 assembly: counting the bits of AX</h2>
+        <p>The same algorithm as the simulator, written with <b>SHR</b>, <b>JNC</b>, <b>INC</b> and <b>LOOP</b>. The value is in <span class="mono">AX</span>, ONES in <span class="mono">BL</span>, ZEROS in <span class="mono">BH</span> and Count in <span class="mono">CX</span>.</p>
         <ul>
-          <li><b class="mono">mul16.asm</b> (NASM, 32-bit Linux): prints the inputs, a 16-line step table and the product. <b>To run it:</b> open <a href="https://onecompiler.com/assembly" target="_blank" rel="noopener">onecompiler.com/assembly</a>, delete the sample code, paste the program (use <i>Copy</i> below) and press <b>Run</b>. Change the inputs in the two <span class="mono">dw</span> lines at the top.</li>
-          <li><b class="mono">mul16_8086.asm</b> (MASM/TASM, 8086 lab-manual style): open it in <b>emu8086</b> and press <i>Emulate &rarr; Run</i>, or assemble it in DOSBox with MASM + LINK. It stores the product in <span class="mono">PROD_HI:PROD_LO</span> and prints it in hex.</li>
+          <li><b class="mono">count16.asm</b> (NASM, 32-bit Linux): prints the input in hex and binary, a 16-line step table and both counts. <b>To run it:</b> open <a href="https://onecompiler.com/assembly" target="_blank" rel="noopener">onecompiler.com/assembly</a>, delete the sample code, paste the program (use <i>Copy</i> below) and press <b>Run</b>. Change the input in the <span class="mono">num dw 1234h</span> line at the top.</li>
+          <li><b class="mono">count16_8086.asm</b> (MASM/TASM, 8086 lab-manual style): open it in <b>emu8086</b> and press <i>Emulate &rarr; Run</i>, or assemble it in DOSBox with MASM + LINK. It stores the results in the memory variables <span class="mono">ONES</span> and <span class="mono">ZEROS</span> and prints them in decimal.</li>
         </ul>
-        <p><button type="button" class="linkbtn" id="asm-preset">Show 1234H &times; 5678H in the simulator &rarr;</button> <span class="muted">(the same 16 partial products as the program prints)</span></p>
+        <p><button type="button" class="linkbtn" id="asm-preset">Show 1234H in the simulator &rarr;</button> <span class="muted">(the same 16 CF values as the program prints)</span></p>
       </div>
 
       <div class="card">
         <div class="codehead">
           <div class="seg" role="radiogroup" aria-label="Program">
-            <label><input type="radio" name="prog" value="nasm" checked><span>mul16.asm (NASM)</span></label>
-            <label><input type="radio" name="prog" value="masm"><span>mul16_8086.asm (MASM)</span></label>
+            <label><input type="radio" name="prog" value="nasm" checked><span>count16.asm (NASM)</span></label>
+            <label><input type="radio" name="prog" value="masm"><span>count16_8086.asm (MASM)</span></label>
           </div>
           <div class="codebtns">
             <button type="button" id="btn-copy">Copy code</button>
@@ -600,7 +584,7 @@
       </div>
 
       <div class="card">
-        <h2>Expected output of mul16.asm (default inputs 1234H &times; 5678H)</h2>
+        <h2>Expected output of count16.asm (default input 1234H)</h2>
         <p class="muted">Copied from a real run (<span class="mono">nasm -f elf32</span>, <span class="mono">ld -m elf_i386</span>). Exit code 0.</p>
         <pre class="code out" id="asm-out"></pre>
       </div>
@@ -611,52 +595,51 @@
         <table class="mini map">
           <thead><tr><th>Algorithm step</th><th>Instructions</th><th>What happens</th></tr></thead>
           <tbody>
-            <tr><td>P = 0, Count = 16</td><td class="mono">XOR AX,AX<br>XOR DX,DX<br>MOV CX,16</td><td>P is 32 bits, kept in <span class="mono">DX:AX</span> (high:low). Count is in CX.</td></tr>
-            <tr><td>Load M and Q</td><td class="mono">MOV SI,[num1]<br>XOR BX,BX<br>MOV DI,[num2]</td><td>M is widened to 32 bits in <span class="mono">BX:SI</span> (high word 0) so it can shift left 16 times. Q is in DI.</td></tr>
-            <tr><td>Q<sub>0</sub> = 1 ?</td><td class="mono">TEST DI,1<br>JZ skip_add</td><td>TEST ANDs without changing DI. ZF = 1 means Q<sub>0</sub> = 0, so the add is skipped.</td></tr>
-            <tr><td class="add-c">P = P + M</td><td class="mono">ADD AX,SI<br>ADC DX,BX</td><td>ADD the low words; a carry out of bit 15 goes into CF. ADC adds the high words <b>plus that carry</b>. Without ADC the carry would be lost.</td></tr>
-            <tr><td>Shift M left</td><td class="mono">SHL SI,1<br>RCL BX,1</td><td>SHL moves the top bit of SI into CF. RCL rotates CF into bit 0 of BX, so the 32-bit M doubles.</td></tr>
-            <tr><td>Shift Q right</td><td class="mono">SHR DI,1</td><td>Logical shift: a 0 enters at the top and the next multiplier bit becomes Q<sub>0</sub>.</td></tr>
-            <tr><td>Count = Count &minus; 1</td><td class="mono">DEC CX<br>JNZ next_bit</td><td>Repeat until all 16 bits are done. DX:AX is the product.</td></tr>
+            <tr><td>Load AX and save it</td><td class="mono">MOV AX,[num]<br>PUSH AX</td><td>The shifting will destroy AX, so a copy goes on the stack first.</td></tr>
+            <tr><td>ONES = 0, ZEROS = 0, Count = 16</td><td class="mono">XOR BL,BL<br>XOR BH,BH<br>MOV CX,16</td><td>XOR of a register with itself gives 0. ONES is in BL, ZEROS in BH, Count in CX.</td></tr>
+            <tr><td>Shift AX right</td><td class="mono">SHR AX,1</td><td>Logical shift: every bit moves one place right, a 0 enters at bit 15 and the old bit 0 goes into <b>CF</b>.</td></tr>
+            <tr><td>CF = 1 ?</td><td class="mono">JNC bit_zero</td><td>JNC jumps when CF = 0 (the bit was a 0). If it does not jump, CF = 1. (<span class="mono">JC</span> is the opposite test and would work with the two branches swapped.)</td></tr>
+            <tr><td class="add-c">ONES++</td><td class="mono">INC BL<br>JMP counted</td><td>Count a 1 bit, then jump over the ZEROS branch.</td></tr>
+            <tr><td class="zero-c">ZEROS++</td><td class="mono">INC BH</td><td>Count a 0 bit. INC does not change CF.</td></tr>
+            <tr><td>Count = Count &minus; 1</td><td class="mono">LOOP next_bit</td><td>LOOP does <span class="mono">DEC CX</span> and <span class="mono">JNZ</span> in one instruction: CX = CX &minus; 1, and jump back while CX is not 0.</td></tr>
+            <tr><td>Restore AX</td><td class="mono">POP AX</td><td>AX is 0000H after 16 shifts; POP brings the original value back. BL and BH hold the answer.</td></tr>
           </tbody>
         </table>
         </div>
       </div>
     </section>
 
-    <section id="panel-vs" role="tabpanel" aria-labelledby="tab-vs" hidden>
+    <section id="panel-other" role="tabpanel" aria-labelledby="tab-other" hidden>
       <div class="card prose">
-        <h2>Shift-and-add vs Booth's algorithm</h2>
-        <h3>1. Unsigned vs signed</h3>
-        <p>Shift-and-add treats every bit pattern as an <b>unsigned</b> number. In 4 bits, <span class="mono">1111</span> is 15 here, but in two's complement the same bits mean &minus;1. So if you feed it a negative number you get the wrong answer: &minus;1 &times; 3 becomes 15 &times; 3 = 45 = <span class="mono">0010 1101</span>, while the correct signed product &minus;3 is <span class="mono">1111 1101</span>. That is why this visualizer accepts only unsigned inputs.</p>
-        <p><b>Booth's algorithm</b> works on two's complement numbers directly: it decides on the pair Q<sub>0</sub> Q<sub>&minus;1</sub>, can <i>subtract</i> M as well as add it, and uses an <i>arithmetic</i> right shift that keeps the sign. Positive and negative operands go through the same steps.</p>
-        <h3>2. Runs of 1s</h3>
-        <p>Shift-and-add needs one addition for <i>every</i> 1 in the multiplier. Booth needs one subtraction where a run of 1s starts and one addition just after it ends, however long the run is.</p>
-        <table class="mini">
-          <thead><tr><th>Multiplier (8 bits)</th><th>Shift-and-add: additions</th><th>Booth: add/sub</th></tr></thead>
-          <tbody>
-            <tr><td class="mono">0111 1110</td><td>6</td><td>2</td></tr>
-            <tr><td class="mono">0000 1111</td><td>4</td><td>2</td></tr>
-            <tr><td class="mono">0101 0101</td><td>4</td><td>8 <span class="muted">(alternating bits: Booth is worse)</span></td></tr>
-          </tbody>
-        </table>
-        <p class="live" id="vs-live"></p>
-        <h3>3. Side by side</h3>
+        <h2>Other ways to count bits</h2>
+        <h3>1. Rotate instead of shift (ROL / ROR)</h3>
+        <p><span class="mono">ROL AX,1</span> also copies a bit into CF (the bit that leaves the top), but that bit comes back in at the bottom instead of being lost. After <b>16 rotations</b> every bit is back where it started, so <b>AX is intact</b> and no <span class="mono">PUSH</span>/<span class="mono">POP</span> is needed. The loop is otherwise identical: <span class="mono">ROL AX,1</span>, <span class="mono">JNC</span>, <span class="mono">INC</span>, <span class="mono">LOOP</span>.</p>
+        <h3>2. TEST with a mask</h3>
+        <p>Keep a one-bit mask in another register, starting at <span class="mono">0001H</span>. <span class="mono">TEST AX,DX</span> ANDs them without changing either and sets ZF when that bit is 0; then <span class="mono">SHL DX,1</span> moves the mask to the next bit. AX is never changed, but it needs an extra register and the test is on ZF instead of CF.</p>
+        <h3>3. Kernighan's trick: x &amp; (x &minus; 1)</h3>
+        <p>Subtracting 1 flips the lowest 1 bit and every 0 below it, so <span class="mono">x AND (x &minus; 1)</span> <b>clears the lowest 1 bit</b>. Repeat until x = 0 and count the repeats: that is the number of 1s, and ZEROS = 16 &minus; ONES. The loop runs once per 1 bit instead of 16 times.</p>
+        <p class="live" id="other-live"></p>
+        <h3>4. Side by side</h3>
         <div class="tablewrap">
         <table class="mini">
-          <thead><tr><th></th><th>Shift-and-add (this page)</th><th>Booth's</th></tr></thead>
+          <thead><tr><th></th><th>SHR + CF (this page)</th><th>ROL + CF</th><th>TEST + mask</th><th>Kernighan</th></tr></thead>
           <tbody>
-            <tr><td>Numbers</td><td>unsigned</td><td>signed (two's complement)</td></tr>
-            <tr><td>Decision</td><td>Q<sub>0</sub></td><td>Q<sub>0</sub> Q<sub>&minus;1</sub></td></tr>
-            <tr><td>Operations</td><td class="add-c">add M</td><td><span class="add-c">add M</span>, <span class="sub-c">subtract M</span></td></tr>
-            <tr><td>Shift</td><td>M left, Q right (logical)</td><td>A, Q, Q<sub>&minus;1</sub> right (arithmetic)</td></tr>
-            <tr><td>Adds needed</td><td>one per 1 bit</td><td>one per start/end of a run of 1s</td></tr>
-            <tr><td>Cycles</td><td><i>n</i></td><td><i>n</i></td></tr>
-            <tr><td>Product</td><td>2<i>n</i>-bit P, never overflows</td><td>2<i>n</i>-bit A Q</td></tr>
+            <tr><td>Loop runs</td><td>16 times</td><td>16 times</td><td>16 times</td><td>once per 1 bit</td></tr>
+            <tr><td>AX afterwards</td><td>0000H (save it first)</td><td>unchanged</td><td>unchanged</td><td>0000H (save it first)</td></tr>
+            <tr><td>Flag tested</td><td>CF</td><td>CF</td><td>ZF</td><td>ZF</td></tr>
+            <tr><td>Extra register</td><td>none</td><td>none</td><td>the mask</td><td>a copy for x &minus; 1</td></tr>
+            <tr><td>Counts 0s directly</td><td>yes</td><td>yes</td><td>yes</td><td>no (16 &minus; ONES)</td></tr>
           </tbody>
         </table>
         </div>
-        <p>See signed multiplication step by step in the sibling project: <a href="https://anmol-goyal7.github.io/booths-algorithm-visualizer/" target="_blank" rel="noopener">Booth's Multiplication Algorithm Visualizer &#8599;</a></p>
+        <h3>5. Why shift-and-count is the textbook one</h3>
+        <ul>
+          <li>It shows the purpose of the <b>carry flag</b> directly: a shift moves one bit into CF, and <span class="mono">JC</span>/<span class="mono">JNC</span> branch on it.</li>
+          <li>It counts 1s <b>and</b> 0s in the same loop, which is exactly what the problem asks for.</li>
+          <li>It always takes 16 cycles whatever the value is, so the step table is the same size for every input and easy to trace by hand.</li>
+          <li>It uses only the most basic instructions: <span class="mono">SHR</span>, <span class="mono">JNC</span>, <span class="mono">INC</span>, <span class="mono">LOOP</span>.</li>
+        </ul>
+        <p class="muted">Newer processors have a single instruction for this (<span class="mono">POPCNT</span>), but the 8086 does not.</p>
       </div>
     </section>
   </main>
@@ -672,22 +655,16 @@
 </div>
 
 <!--
-  SHIFT-AND-ADD CORE: pure functions with no DOM access.
+  BIT-COUNT CORE: pure functions with no DOM access.
   test.js extracts THIS script block from index.html and runs it under Node,
   so the browser and the tests always exercise the exact same code.
 -->
-<script id="shiftadd-core">
+<script id="bitcount-core">
 (function (root) {
   'use strict';
 
-  var WIDTHS = [4, 8, 16];
-  var NEG_MSG = 'unsigned only - see Booth\'s for signed';
-
-  function pow2(k) { return Math.pow(2, k); }
-
-  // Unsigned n-bit range. Every value used here stays below 2^32, so plain
-  // JavaScript numbers are exact (they are exact up to 2^53).
-  function range(n) { return { min: 0, max: pow2(n) - 1 }; }
+  var WIDTH = 16;          // AX is a 16-bit register
+  var MAX = 0xFFFF;
 
   // Unsigned binary string of value, zero-padded to width bits.
   function toBits(value, width) {
@@ -717,371 +694,329 @@
       if (!m) return { err: 'Hex digits only (0-9, A-F), e.g. 1234 or 1234H.' };
       v = parseInt(m[1] || m[2], 16);
     } else {
-      if (!/^\d+$/.test(s)) return { err: 'Whole numbers only, e.g. 13 or 255.' };
+      if (!/^\d+$/.test(s)) return { err: 'Whole numbers only, e.g. 4660 or 65535.' };
       v = parseInt(s, 10);
     }
     return { v: neg ? -v : v };
   }
 
-  function isInt(v) { return typeof v === 'number' && isFinite(v) && Math.floor(v) === v; }
-
-  // Returns { ok, errors: { m?, q?, n? } }. Messages are written for the UI.
-  function validate(m, q, n) {
-    var errors = {};
-    var badN = WIDTHS.indexOf(n) === -1;
-    if (badN) errors.n = 'Bit width must be 4, 8 or 16.';
-    var r = range(badN ? 16 : n), d = (badN ? 16 : n) / 4;
-    [['m', m, 'Multiplicand'], ['q', q, 'Multiplier']].forEach(function (f) {
-      var v = f[1];
-      if (v === null || v === undefined || v === '' || (typeof v === 'number' && isNaN(v))) {
-        errors[f[0]] = 'Enter a number.';
-      } else if (!isInt(v)) {
-        errors[f[0]] = 'Whole numbers only.';
-      } else if (v < 0) {
-        errors[f[0]] = 'No negative numbers: ' + NEG_MSG + '.';
-      } else if (!badN && v > r.max) {
-        errors[f[0]] = f[2] + ' must be between 0 and ' + r.max + ' (' + toHex(0, d) + 'H to ' +
-          toHex(r.max, d) + 'H) for ' + n + ' bits.';
-      }
-    });
-    return { ok: Object.keys(errors).length === 0, errors: errors };
+  // Returns { ok, error }. The message is written for the UI.
+  function validate(v) {
+    var error = '';
+    if (v === null || v === undefined || v === '' || (typeof v === 'number' && isNaN(v))) {
+      error = 'Enter a number.';
+    } else if (typeof v !== 'number' || !isFinite(v) || Math.floor(v) !== v) {
+      error = 'Whole numbers only.';
+    } else if (v < 0) {
+      error = 'No negative numbers: enter the 16-bit pattern itself, 0000H to FFFFH.';
+    } else if (v > MAX) {
+      error = 'AX is 16 bits: the value must be between 0 and 65535 (0000H to FFFFH).';
+    }
+    return { ok: error === '', error: error };
   }
 
   /*
-    Shift-and-add multiplication, textbook form (unsigned).
-      M = multiplicand (held in a 2n-bit register), Q = multiplier (n bits),
-      P = 0 (2n bits), Count = n
-      repeat n times:
-        if Q0 = 1 then P = P + M        else no add
-        shift M left by 1, shift Q right by 1 (logical), Count = Count - 1
-      P is the product.
-    P never overflows: the largest product (2^n - 1)^2 = 2^2n - 2^(n+1) + 1 < 2^2n.
-    M never loses a bit either: after n shifts it is M * 2^n < 2^2n.
+    Shift-and-count, textbook form.
+      AX = 16-bit value, ONES = 0, ZEROS = 0, Count = 16
+      repeat until Count = 0:
+        shift AX right by 1 (logical); the bit shifted out goes into CF
+        if CF = 1 then ONES = ONES + 1 else ZEROS = ZEROS + 1
+        Count = Count - 1
+    ONES + ZEROS = 16 at the end, because every cycle counts exactly one bit.
+    The shifting destroys AX, so the original value is saved first.
   */
-  function multiply(m, q, n) {
-    var v = validate(m, q, n);
+  function count(value) {
+    var v = validate(value);
     if (!v.ok) {
-      var e = new Error('Invalid input: ' + JSON.stringify(v.errors));
-      e.errors = v.errors;
+      var e = new Error('Invalid input: ' + v.error);
+      e.error = v.error;
       throw e;
     }
-    var w = 2 * n;
-    var M = m, Q = q, P = 0, count = n;
+    var saved = value;                 // PUSH AX: keep the original
+    var AX = value, CF = null, ONES = 0, ZEROS = 0, cnt = WIDTH;
     var rows = [];
     function row(o) {
-      o.M = toBits(M, w); o.Q = toBits(Q, n); o.P = toBits(P, w);
-      o.mVal = M; o.qVal = Q; o.pVal = P; o.count = count;
+      o.ax = toBits(AX, WIDTH); o.axVal = AX; o.cf = CF === null ? '' : String(CF);
+      o.ones = ONES; o.zeros = ZEROS; o.count = cnt;
       rows.push(o);
     }
 
-    row({ kind: 'init', cycle: 0, label: 'Initial', q0: '', action: 'Initialise', added: 0,
-      why: 'P = 0, Count = ' + n + '. M is held in ' + w + ' bits. First look at Q0 = ' + (Q % 2) + '.' });
+    row({ kind: 'init', step: 0, label: 'Initial', action: 'Save AX',
+      why: 'AX = ' + toHex(value, 4) + 'H is saved first (PUSH AX). ONES = 0, ZEROS = 0, Count = 16.' });
 
-    for (var cycle = 1; cycle <= n; cycle++) {
-      var q0 = Q % 2;
-      if (q0 === 1) {
-        P = P + M;
-        row({ kind: 'add', cycle: cycle, label: String(cycle), q0: '1', action: 'Add M', added: M,
-          why: 'Q0 = 1, so add M to P: P = ' + (P - M) + ' + ' + M + ' = ' + P + '.' });
-      } else {
-        row({ kind: 'skip', cycle: cycle, label: String(cycle), q0: '0', action: 'No add', added: 0,
-          why: 'Q0 = 0, so no add. P stays ' + P + '.' });
-      }
-      M = M * 2;                 // shift left: one place more significant
-      Q = Math.floor(Q / 2);     // logical shift right: 0 enters at the top
-      count -= 1;
-      row({ kind: 'shift', cycle: cycle, label: '', q0: '', action: 'Shift M left, Q right', added: 0,
-        why: 'Shift M left (M = ' + M + ') and Q right by one bit. Count = ' + count +
-          (count > 0 ? '. Next Q0 = ' + (Q % 2) + '.' : ', so stop. P is the product.') });
+    for (var step = 1; step <= WIDTH; step++) {
+      CF = AX % 2;                     // SHR AX,1: bit 0 drops into CF ...
+      AX = Math.floor(AX / 2);         // ... and a 0 enters at the top
+      if (CF === 1) ONES += 1; else ZEROS += 1;
+      cnt -= 1;
+      row({ kind: CF === 1 ? 'one' : 'zero', step: step, label: String(step),
+        action: CF === 1 ? 'ONES++' : 'ZEROS++',
+        why: 'CF = ' + CF + ', so ' + (CF === 1 ? 'ONES++ (ONES = ' + ONES + ')' : 'ZEROS++ (ZEROS = ' + ZEROS + ')') +
+          '. Count = ' + cnt + (cnt > 0 ? '.' : ', so stop. POP AX restores ' + toHex(saved, 4) + 'H.') });
     }
 
     return {
-      m: m, q: q, n: n, width: w,
-      Mbits: toBits(m, n), Qbits: toBits(q, n),
+      value: value, hex: toHex(value, 4), bits: toBits(value, WIDTH),
+      saved: saved,                    // what POP AX puts back into AX
       rows: rows,
-      // P after each cycle (what the assembly program prints per step)
-      partials: rows.filter(function (r) { return r.kind === 'add' || r.kind === 'skip'; })
-        .map(function (r) { return r.pVal; }),
-      product: { bits: toBits(P, w), value: P, hex: toHex(P, w / 4) }
+      cfs: rows.slice(1).map(function (r) { return +r.cf; }),   // CF after each shift
+      ones: ONES, zeros: ZEROS, total: ONES + ZEROS
     };
   }
 
-  root.ShiftAdd = {
-    WIDTHS: WIDTHS, NEG_MSG: NEG_MSG, range: range, toBits: toBits, toHex: toHex,
-    parseNumber: parseNumber, validate: validate, multiply: multiply
+  root.BitCount = {
+    WIDTH: WIDTH, MAX: MAX, toBits: toBits, toHex: toHex,
+    parseNumber: parseNumber, validate: validate, count: count
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
 </script>
 
 <!-- The assembly programs, embedded so the page works offline from file://.
-     test.js checks they are identical to mul16.asm and mul16_8086.asm, and
+     test.js checks they are identical to count16.asm and count16_8086.asm, and
      test_asm.sh checks the output block against a real run. -->
 <script type="text/plain" id="src-nasm">
 ;=====================================================================
-; mul16.asm  -  16-bit x 16-bit unsigned multiplication by SHIFT-AND-ADD
-;               (the MUL / IMUL instructions are not used anywhere)
+; count16.asm  -  count the 1 bits and the 0 bits of the AX register
+;                 by the SHIFT-AND-COUNT method
 ;
-; COA Lab Problem 15: Multiply two 16-bit numbers using the shift-and-add
-;                     method instead of using the native MUL instruction.
+; COA Lab Problem 16: Count the total number of set bits (1s) and
+;                     cleared bits (0s) within the AX register.
 ;
 ; Assembler : NASM, 32-bit Linux (system calls through int 0x80)
 ; Online    : paste this whole file into https://onecompiler.com/assembly
 ;             and press Run.
-; Locally   : nasm -f elf32 mul16.asm -o mul16.o
-;             ld -m elf_i386 mul16.o -o mul16
-;             ./mul16
+; Locally   : nasm -f elf32 count16.asm -o count16.o
+;             ld -m elf_i386 count16.o -o count16
+;             ./count16
 ;
-; Algorithm (n = 16):
-;     M = multiplicand (widened to 32 bits), Q = multiplier,
-;     P = 0 (32 bits), Count = 16
+; Algorithm:
+;     AX = the 16-bit value, ONES = 0, ZEROS = 0, Count = 16
 ;     repeat until Count = 0:
-;         if Q0 = 1 then P = P + M      ; 32-bit add = ADD low + ADC high
-;         shift M left by 1             ; 32-bit shift = SHL low + RCL high
-;         shift Q right by 1 (logical)  ; SHR
+;         shift AX right by 1 (logical) ; SHR: the bit shifted out -> CF
+;         if CF = 1 then ONES  = ONES  + 1
+;                   else ZEROS = ZEROS + 1
 ;         Count = Count - 1
-;     P is the product. It always fits in 32 bits, because the largest
-;     possible product is FFFFH x FFFFH = FFFE0001H < 2^32, so it can
-;     never overflow.
+;     ONES + ZEROS = 16 always, because every cycle counts exactly one bit.
+;     The shifting destroys AX (it ends as 0000H), so the original value
+;     is saved on the stack first (PUSH AX) and restored at the end (POP AX).
 ;
-; Register map of the algorithm (16-bit registers only):
-;     SI = M low word         BX = M high word      (M is in BX:SI)
-;     DI = Q (multiplier)     CX = Count
-;     AX = P low word         DX = P high word      (P is in DX:AX)
+; Register map of the algorithm (16-bit and 8-bit registers only):
+;     AX = the value being shifted        CX = Count
+;     BL = ONES  (number of 1 bits)       BH = ZEROS (number of 0 bits)
 ; 32-bit registers appear only inside the print / system-call helpers
-; at the end of the file, and every helper preserves the six registers
-; above, so the algorithm never sees them change.
+; at the end of the file, and every helper preserves AX, BX and CX,
+; so the algorithm never sees them change.
 ;=====================================================================
 
 section .data
     ;------------------------------------------------------------------
-    ; INPUTS: change the two numbers here (hex with an h suffix).
+    ; INPUT: change the number here (hex with an h suffix).
     ; A value that starts with A-F needs a leading 0, e.g. 0FFFFh.
     ;------------------------------------------------------------------
-    num1        dw 1234h            ; multiplicand M
-    num2        dw 5678h            ; multiplier   Q
+    num         dw 1234h            ; the value loaded into AX
 
     ; text printed by the helpers
-    msg_title   db "Shift-and-Add Multiplication (no MUL)", 10
+    msg_title   db "Count 1s and 0s in AX", 10
     len_title   equ $ - msg_title
-    msg_mcand   db "Multiplicand : "
-    len_mcand   equ $ - msg_mcand
-    msg_mplier  db "Multiplier   : "
-    len_mplier  equ $ - msg_mplier
-    msg_head    db "Step | Q0 | Action | Partial Product", 10
-    len_head    equ $ - msg_head
-    msg_prod    db "Product      : "
-    len_prod    equ $ - msg_prod
-    msg_hopen   db "H ("                ; between the hex and decimal forms
+    msg_ax      db "AX    : "
+    len_ax      equ $ - msg_ax
+    msg_hopen   db "H ("                ; between the hex and binary forms
     len_hopen   equ $ - msg_hopen
-    msg_close   db ")", 10
-    len_close   equ $ - msg_close
+    msg_bclose  db "b)", 10
+    len_bclose  equ $ - msg_bclose
+    msg_head    db "Step | CF | Action", 10
+    len_head    equ $ - msg_head
     msg_bar     db "   | "              ; after the step number
     len_bar     equ $ - msg_bar
-    msg_add     db "  | ADD M  | "       ; after Q0 when Q0 = 1
-    len_add     equ $ - msg_add
-    msg_skip    db "  | SKIP   | "       ; after Q0 when Q0 = 0
-    len_skip    equ $ - msg_skip
-    msg_hnl     db "H", 10
-    len_hnl     equ $ - msg_hnl
+    msg_one     db "  | ONES++", 10     ; after CF when CF = 1
+    len_one     equ $ - msg_one
+    msg_zero    db "  | ZEROS++", 10    ; after CF when CF = 0
+    len_zero    equ $ - msg_zero
+    msg_ones    db "Ones  : "
+    len_ones    equ $ - msg_ones
+    msg_zeros   db "Zeros : "
+    len_zeros   equ $ - msg_zeros
+    msg_nl      db 10
     hexdigits   db "0123456789ABCDEF"
 
 section .bss
     numbuf      resb 12                 ; decimal digits are built here
     hexbuf      resb 8                  ; hex digits are built here
-    save_lo     resw 1                  ; helper scratch: P low word
-    save_hi     resw 1                  ; helper scratch: P high word
-    save_q      resw 1                  ; helper scratch: Q
+    binbuf      resb 16                 ; binary digits are built here
+    save_cnt    resw 1                  ; helper scratch: BX (ZEROS:ONES)
     save_e      resd 1                  ; helper scratch: a 32-bit value
 
 section .text
     global _start
 
 ;=====================================================================
-; MAIN PROGRAM: the shift-and-add algorithm
+; MAIN PROGRAM: the shift-and-count algorithm
 ;=====================================================================
 _start:
-    ;--- print the title, both inputs and the table heading ----------
+    ;--- print the title, the input and the table heading -------------
     call    print_banner
 
-    ;--- Step 1: initialise ------------------------------------------
-    mov     si, [num1]          ; SI = M low word = multiplicand
-    xor     bx, bx              ; BX = M high word = 0 (M widened to 32 bits)
-    mov     di, [num2]          ; DI = Q = multiplier
-    xor     ax, ax              ; AX = P low word  = 0
-    xor     dx, dx              ; DX = P high word = 0
-    mov     cx, 16              ; CX = Count = n = 16 bits
+    ;--- Step 1: load the value and save a copy -----------------------
+    mov     ax, [num]           ; AX = the value to examine
+    push    ax                  ; save the original AX (shifting destroys it)
+
+    ;--- Step 2: initialise the counters ------------------------------
+    xor     bl, bl              ; BL = ONES  = 0
+    xor     bh, bh              ; BH = ZEROS = 0
+    mov     cx, 16              ; CX = Count = 16 bits
 
 next_bit:
-    ;--- Step 2: test Q0, the lowest bit of the multiplier ------------
-    test    di, 1               ; ZF = 1 when Q0 = 0
-    jz      skip_add            ; Q0 = 0: no add this cycle
+    ;--- Step 3: shift AX right by 1, the lowest bit drops into CF ----
+    shr     ax, 1               ; logical shift: 0 enters at the top
+    jnc     bit_zero            ; CF = 0: the bit was a 0
 
-    ;--- Step 3: Q0 = 1, so P = P + M (32-bit add on 16-bit halves) --
-    add     ax, si              ; P low  = P low  + M low, carry out -> CF
-    adc     dx, bx              ; P high = P high + M high + CF
+    ;--- Step 4a: CF = 1, so count a one ------------------------------
+    inc     bl                  ; ONES = ONES + 1   (INC leaves CF alone)
+    jmp     counted
 
-skip_add:
-    ;--- print this step: number, Q0, ADD M / SKIP, partial product ---
+bit_zero:
+    ;--- Step 4b: CF = 0, so count a zero -----------------------------
+    inc     bh                  ; ZEROS = ZEROS + 1 (INC leaves CF alone)
+
+counted:
+    ;--- print this step: number, CF, ONES++ / ZEROS++ ----------------
     call    print_step
 
-    ;--- Step 4: shift M left by 1 (32-bit shift on 16-bit halves) ---
-    shl     si, 1               ; M low << 1, its top bit -> CF
-    rcl     bx, 1               ; M high << 1, CF -> bit 0 of M high
+    ;--- Step 5: Count = Count - 1, repeat until Count = 0 ------------
+    loop    next_bit            ; CX = CX - 1, jump if CX is not 0
 
-    ;--- Step 5: shift Q right by 1 so the next bit becomes Q0 -------
-    shr     di, 1               ; logical shift: a 0 enters at the top
+    ;--- Step 6: AX is now 0000H, so restore the saved original -------
+    pop     ax                  ; AX = original value again
 
-    ;--- Step 6: Count = Count - 1, repeat until Count = 0 -----------
-    dec     cx
-    jnz     next_bit
-
-    ;--- Step 7: DX:AX now holds the 32-bit product -------------------
-    call    print_product
+    ;--- Step 7: BL = number of 1s, BH = number of 0s -----------------
+    call    print_result
     call    exit_program
 
 
 ;=====================================================================
 ; HELPERS (printing and system calls). These are the only places that
-; use 32-bit registers. Each public helper saves and restores the six
-; 16-bit registers of the algorithm with push/pop. (32-bit values are
-; parked in memory rather than pushed, so the file also assembles as
-; 64-bit code if an online compiler uses nasm -f elf64.)
+; use 32-bit registers. Each public helper saves and restores AX, BX
+; and CX with push/pop. (32-bit values are parked in memory rather than
+; pushed, so the file also assembles as 64-bit code if an online
+; compiler uses nasm -f elf64.)
+;
+; On a real 8086 LOOP counts with CX. In this 32-bit build the same
+; instruction counts with the whole of ECX, so every public helper ends
+; with "movzx ecx, cx", which keeps the upper half of ECX at zero and
+; makes ECX equal to CX.
 ;=====================================================================
 
 ;---------------------------------------------------------------------
-; print_banner: title, "Multiplicand : 1234H (4660)",
-;               "Multiplier   : 5678H (22136)" and the table heading.
+; print_banner: title, "AX    : 1234H (0001001000110100b)" and the
+;               table heading.
 ;---------------------------------------------------------------------
 print_banner:
     push    ax
     push    bx
     push    cx
-    push    dx
-    push    si
-    push    di
     mov     ecx, msg_title
     mov     edx, len_title
     call    write
-    mov     ecx, msg_mcand
-    mov     edx, len_mcand
+    mov     ecx, msg_ax
+    mov     edx, len_ax
     call    write
-    movzx   eax, word [num1]
-    call    put_value16
-    mov     ecx, msg_mplier
-    mov     edx, len_mplier
+    movzx   eax, word [num]
+    mov     ecx, 4
+    call    put_hex             ; the value as 4 hex digits
+    mov     ecx, msg_hopen
+    mov     edx, len_hopen
     call    write
-    movzx   eax, word [num2]
-    call    put_value16
+    movzx   eax, word [num]
+    call    put_bin16           ; the value as 16 binary digits
+    mov     ecx, msg_bclose
+    mov     edx, len_bclose
+    call    write
     mov     ecx, msg_head
     mov     edx, len_head
     call    write
-    pop     di
-    pop     si
-    pop     dx
     pop     cx
     pop     bx
     pop     ax
+    movzx   ecx, cx             ; ECX = CX (see the note above)
     ret
 
 ;---------------------------------------------------------------------
-; print_step: one table line, e.g. " 4   | 1  | ADD M  | 000091A0H"
-;   in: CX = Count before it is decremented (16..1), so step = 17 - CX
-;       DI = Q (bit 0 is the Q0 tested this cycle)
-;       DX:AX = partial product P after this cycle's add
+; print_step: one table line, e.g. " 3   | 1  | ONES++"
+;   in: CF = the bit that SHR just shifted out (CALL, PUSH, MOV, INC
+;            and JMP do not change CF, so it is still valid here)
+;       CX = Count before it is decremented (16..1), so step = 17 - CX
 ;---------------------------------------------------------------------
 print_step:
     push    ax
     push    bx
     push    cx
-    push    dx
-    push    si
-    push    di
-    mov     [save_lo], ax       ; keep P and Q, the syscalls clobber registers
-    mov     [save_hi], dx
-    mov     [save_q], di
+    mov     dword [save_e], 0   ; remember CF as 0 or 1 (MOV keeps flags)
+    jnc     .cf_saved
+    mov     dword [save_e], 1
+.cf_saved:
     ; step number, right-aligned in 2 columns
     movzx   eax, cx
     neg     eax
     add     eax, 17             ; EAX = 17 - Count = step number
     cmp     eax, 10
     jae     .two_digits
-    mov     [save_e], eax
+    push    ax                  ; keep the step number over the write
     mov     ecx, msg_bar        ; a leading space (first byte of "   | ")
     mov     edx, 1
     call    write
-    mov     eax, [save_e]
+    pop     ax
+    movzx   eax, ax
 .two_digits:
     call    put_dec
     mov     ecx, msg_bar
     mov     edx, len_bar
     call    write
-    ; Q0 as '0' or '1', then the action
-    movzx   eax, word [save_q]
-    and     eax, 1
-    mov     [save_e], eax
-    call    put_dec
+    ; CF as '0' or '1', then the action
     mov     eax, [save_e]
-    mov     ecx, msg_skip
-    mov     edx, len_skip
-    test    eax, eax
-    jz      .action
-    mov     ecx, msg_add
-    mov     edx, len_add
+    call    put_dec
+    mov     ecx, msg_zero
+    mov     edx, len_zero
+    cmp     dword [save_e], 0
+    je      .action
+    mov     ecx, msg_one
+    mov     edx, len_one
 .action:
     call    write
-    ; partial product as 8 hex digits
-    movzx   eax, word [save_hi]
-    shl     eax, 16
-    mov     ax, [save_lo]       ; EAX = P = DX:AX
-    mov     ecx, 8
-    call    put_hex
-    mov     ecx, msg_hnl
-    mov     edx, len_hnl
-    call    write
-    pop     di
-    pop     si
-    pop     dx
     pop     cx
     pop     bx
     pop     ax
+    movzx   ecx, cx             ; ECX = CX (see the note above)
     ret
 
 ;---------------------------------------------------------------------
-; print_product: "Product      : 06260060H (103153760)"
-;   in: DX:AX = product
+; print_result: "Ones  : 5" and "Zeros : 11"
+;   in: BL = ONES, BH = ZEROS
 ;---------------------------------------------------------------------
-print_product:
+print_result:
     push    ax
     push    bx
     push    cx
-    push    dx
-    push    si
-    push    di
-    mov     [save_lo], ax
-    mov     [save_hi], dx
-    mov     ecx, msg_prod
-    mov     edx, len_prod
+    mov     [save_cnt], bx      ; the syscalls clobber BX
+    mov     ecx, msg_ones
+    mov     edx, len_ones
     call    write
-    movzx   eax, word [save_hi]
-    shl     eax, 16
-    mov     ax, [save_lo]       ; EAX = DX:AX as one 32-bit value
-    mov     [save_e], eax
-    mov     ecx, 8
-    call    put_hex
-    mov     ecx, msg_hopen
-    mov     edx, len_hopen
-    call    write
-    mov     eax, [save_e]
+    movzx   eax, byte [save_cnt]        ; low byte = BL = ONES
     call    put_dec
-    mov     ecx, msg_close
-    mov     edx, len_close
+    mov     ecx, msg_nl
+    mov     edx, 1
     call    write
-    pop     di
-    pop     si
-    pop     dx
+    mov     ecx, msg_zeros
+    mov     edx, len_zeros
+    call    write
+    movzx   eax, byte [save_cnt + 1]    ; high byte = BH = ZEROS
+    call    put_dec
+    mov     ecx, msg_nl
+    mov     edx, 1
+    call    write
     pop     cx
     pop     bx
     pop     ax
+    movzx   ecx, cx             ; ECX = CX (see the note above)
     ret
 
 ;---------------------------------------------------------------------
@@ -1097,22 +1032,7 @@ exit_program:
 ; helpers above call them.
 ;---------------------------------------------------------------------
 
-; put_value16: "XXXXH (decimal)\n" for the 16-bit value in EAX
-put_value16:
-    mov     [save_e], eax
-    mov     ecx, 4
-    call    put_hex
-    mov     ecx, msg_hopen
-    mov     edx, len_hopen
-    call    write
-    mov     eax, [save_e]
-    call    put_dec
-    mov     ecx, msg_close
-    mov     edx, len_close
-    call    write
-    ret
-
-; put_hex: print the low ECX hex digits of EAX (no MUL: shifts and a table)
+; put_hex: print the low ECX hex digits of EAX (shifts and a table)
 put_hex:
     mov     edi, ecx            ; EDI = number of digits
 .digit:
@@ -1128,7 +1048,22 @@ put_hex:
     call    write
     ret
 
-; put_dec: print EAX as an unsigned decimal number (no MUL: uses DIV by 10)
+; put_bin16: print the low 16 bits of EAX as 16 binary digits
+put_bin16:
+    mov     ecx, 16
+.bit:
+    mov     dl, '0'
+    shr     eax, 1              ; lowest bit -> CF
+    adc     dl, 0               ; '0' + CF = '0' or '1'
+    mov     [binbuf + ecx - 1], dl   ; fill the buffer from the right
+    dec     ecx
+    jnz     .bit
+    mov     ecx, binbuf
+    mov     edx, 16
+    call    write
+    ret
+
+; put_dec: print EAX as an unsigned decimal number (DIV by 10)
 put_dec:
     mov     edi, numbuf + 12    ; fill the buffer from the right
     mov     ebx, 10
@@ -1155,50 +1090,50 @@ write:
 </script>
 <script type="text/plain" id="src-masm">
 ;=====================================================================
-; MUL16_8086.ASM - 16-bit x 16-bit unsigned multiplication by the
-;                  SHIFT-AND-ADD method on the 8086 (no MUL / IMUL)
+; COUNT16_8086.ASM - count the 1 bits and the 0 bits of the AX register
+;                    by the SHIFT-AND-COUNT method on the 8086
 ;
-; COA Lab Problem 15: Multiply two 16-bit numbers using the shift-and-add
-;                     method instead of using the native MUL instruction.
+; COA Lab Problem 16: Count the total number of set bits (1s) and
+;                     cleared bits (0s) within the AX register.
 ;
 ; Assembler : MASM / TASM (DOSBox) or emu8086
 ; emu8086   : File > Open this file, then Emulate > Run.
-; DOSBox    : copy it as MUL16.ASM (DOS uses 8.3 file names), then
-;               MASM MUL16.ASM;     LINK MUL16.OBJ;     MUL16
-;             or TASM MUL16.ASM     TLINK MUL16.OBJ     MUL16
+; DOSBox    : copy it as COUNT16.ASM (DOS uses 8.3 file names), then
+;               MASM COUNT16.ASM;   LINK COUNT16.OBJ;   COUNT16
+;             or TASM COUNT16.ASM   TLINK COUNT16.OBJ   COUNT16
 ;
-; Algorithm (n = 16):
-;     M = multiplicand (widened to 32 bits in BX:SI), Q = multiplier (DI)
-;     P = 0 (32 bits in DX:AX), Count = 16 (CX)
+; Algorithm:
+;     AX = the 16-bit value, ONES = 0 (BL), ZEROS = 0 (BH), Count = 16 (CX)
 ;     repeat until Count = 0:
-;         if Q0 = 1 then P = P + M        (ADD low words, ADC high words)
-;         shift M left 1                  (SHL low word, RCL high word)
-;         shift Q right 1 (logical)       (SHR)
-;         Count = Count - 1
-;     The 32-bit product is stored in PROD_HI:PROD_LO and printed in hex.
-;     It can never overflow: FFFFH x FFFFH = FFFE0001H fits in 32 bits.
+;         shift AX right by 1 (logical)   (SHR: the bit shifted out -> CF)
+;         if CF = 1 then ONES  = ONES  + 1   (JNC skips this, INC BL)
+;                   else ZEROS = ZEROS + 1   (INC BH)
+;         Count = Count - 1                  (LOOP)
+;     ONES + ZEROS = 16 always. The shifting destroys AX, so the original
+;     value is saved with PUSH AX and restored with POP AX.
+;     The results are stored in the memory variables ONES and ZEROS and
+;     printed in decimal.
 ;
-; Expected output for the default inputs:
-;     SHIFT-AND-ADD MULTIPLICATION (NO MUL)
-;     MULTIPLICAND : 1234H
-;     MULTIPLIER   : 5678H
-;     PRODUCT      : 06260060H
+; Expected output for the default input:
+;     COUNT 1S AND 0S IN AX
+;     AX    : 1234H
+;     ONES  : 5
+;     ZEROS : 11
 ;=====================================================================
 
 .MODEL SMALL
 .STACK 100H
 
 .DATA
-    NUM1    DW 1234H                ; multiplicand M  <-- change inputs here
-    NUM2    DW 5678H                ; multiplier   Q  <-- change inputs here
-    PROD_LO DW ?                    ; product, low word
-    PROD_HI DW ?                    ; product, high word
+    NUM     DW 1234H                ; the value loaded into AX  <-- change it here
+    ONES    DB 0                    ; result: number of 1 bits
+    ZEROS   DB 0                    ; result: number of 0 bits
 
-    MSG1    DB 'SHIFT-AND-ADD MULTIPLICATION (NO MUL)', 0DH, 0AH, '$'
-    MSG2    DB 'MULTIPLICAND : $'
-    MSG3    DB 'H', 0DH, 0AH, 'MULTIPLIER   : $'
-    MSG4    DB 'H', 0DH, 0AH, 'PRODUCT      : $'
-    MSG5    DB 'H', 0DH, 0AH, '$'
+    MSG1    DB 'COUNT 1S AND 0S IN AX', 0DH, 0AH, '$'
+    MSG2    DB 'AX    : $'
+    MSG3    DB 'H', 0DH, 0AH, 'ONES  : $'
+    MSG4    DB 0DH, 0AH, 'ZEROS : $'
+    MSG5    DB 0DH, 0AH, '$'
 
 .CODE
 MAIN PROC
@@ -1206,62 +1141,60 @@ MAIN PROC
     MOV AX, @DATA
     MOV DS, AX
 
-    ;--- print the title and both inputs -----------------------------
+    ;--- print the title and the input -------------------------------
     LEA DX, MSG1
     MOV AH, 09H                     ; DOS: print '$'-terminated string
     INT 21H
     LEA DX, MSG2
     MOV AH, 09H
     INT 21H
-    MOV BX, NUM1
-    CALL PRINT_HEX16                ; multiplicand in hex
-    LEA DX, MSG3
-    MOV AH, 09H
-    INT 21H
-    MOV BX, NUM2
-    CALL PRINT_HEX16                ; multiplier in hex
+    MOV BX, NUM
+    CALL PRINT_HEX16                ; the value in hex
 
-    ;--- Step 1: initialise the registers ----------------------------
-    MOV SI, NUM1                    ; SI = M low word = multiplicand
-    XOR BX, BX                      ; BX = M high word = 0
-    MOV DI, NUM2                    ; DI = Q = multiplier
-    XOR AX, AX                      ; AX = P low word  = 0
-    XOR DX, DX                      ; DX = P high word = 0
+    ;--- Step 1: load the value and save a copy ----------------------
+    MOV AX, NUM                     ; AX = the value to examine
+    PUSH AX                         ; save the original AX (shifting destroys it)
+
+    ;--- Step 2: initialise the counters -----------------------------
+    XOR BL, BL                      ; BL = ONES  = 0
+    XOR BH, BH                      ; BH = ZEROS = 0
     MOV CX, 16                      ; CX = Count = 16
 
 NEXT_BIT:
-    ;--- Step 2: test Q0, the lowest bit of the multiplier ------------
-    TEST DI, 1                      ; ZF = 1 when Q0 = 0
-    JZ SKIP_ADD                     ; Q0 = 0: no add this cycle
+    ;--- Step 3: shift AX right by 1, the lowest bit drops into CF ---
+    SHR AX, 1                       ; logical: 0 enters at the top
+    JNC BIT_ZERO                    ; CF = 0: the bit was a 0
 
-    ;--- Step 3: Q0 = 1, so P = P + M (32-bit add) -------------------
-    ADD AX, SI                      ; low words, carry out -> CF
-    ADC DX, BX                      ; high words + CF
+    ;--- Step 4a: CF = 1, so count a one -----------------------------
+    INC BL                          ; ONES = ONES + 1
+    JMP COUNTED
 
-SKIP_ADD:
-    ;--- Step 4: shift M left by 1 (32-bit shift) --------------------
-    SHL SI, 1                       ; low word, top bit -> CF
-    RCL BX, 1                       ; high word, CF -> bit 0
+BIT_ZERO:
+    ;--- Step 4b: CF = 0, so count a zero ----------------------------
+    INC BH                          ; ZEROS = ZEROS + 1
 
-    ;--- Step 5: shift Q right by 1 so the next bit becomes Q0 -------
-    SHR DI, 1                       ; logical: 0 enters at the top
+COUNTED:
+    ;--- Step 5: Count = Count - 1, repeat until Count = 0 -----------
+    LOOP NEXT_BIT                   ; CX = CX - 1, jump if CX is not 0
 
-    ;--- Step 6: Count = Count - 1, repeat until Count = 0 -----------
-    DEC CX
-    JNZ NEXT_BIT
+    ;--- Step 6: AX is now 0000H, so restore the saved original ------
+    POP AX                          ; AX = original value again
 
-    ;--- Step 7: store the 32-bit product ----------------------------
-    MOV PROD_LO, AX
-    MOV PROD_HI, DX
+    ;--- Step 7: store the results in memory -------------------------
+    MOV ONES, BL
+    MOV ZEROS, BH
 
-    ;--- print the product as 8 hex digits ---------------------------
+    ;--- print both counts in decimal --------------------------------
+    LEA DX, MSG3
+    MOV AH, 09H
+    INT 21H
+    MOV AL, ONES
+    CALL PRINT_DEC8                 ; number of 1 bits
     LEA DX, MSG4
     MOV AH, 09H
     INT 21H
-    MOV BX, PROD_HI
-    CALL PRINT_HEX16                ; high word first
-    MOV BX, PROD_LO
-    CALL PRINT_HEX16                ; then low word
+    MOV AL, ZEROS
+    CALL PRINT_DEC8                 ; number of 0 bits
     LEA DX, MSG5
     MOV AH, 09H
     INT 21H
@@ -1273,7 +1206,7 @@ MAIN ENDP
 
 ;---------------------------------------------------------------------
 ; PRINT_HEX16: print BX as 4 hex digits with INT 21H, AH = 02H.
-; Rotates the top nibble into the bottom each time (no MUL needed).
+; Rotates the top nibble into the bottom each time.
 ; All registers are preserved.
 ;---------------------------------------------------------------------
 PRINT_HEX16 PROC
@@ -1304,30 +1237,60 @@ PH_DIGIT:
     RET
 PRINT_HEX16 ENDP
 
+;---------------------------------------------------------------------
+; PRINT_DEC8: print AL (0..99) in decimal with INT 21H, AH = 02H.
+; DIV by 10 gives the tens digit in AL and the units digit in AH.
+; A leading zero is not printed. All registers are preserved.
+;---------------------------------------------------------------------
+PRINT_DEC8 PROC
+    PUSH AX
+    PUSH BX
+    PUSH DX
+    MOV AH, 0                       ; AX = the number
+    MOV BL, 10
+    DIV BL                          ; AL = tens, AH = units
+    MOV BX, AX                      ; BL = tens, BH = units (INT 21H changes AL)
+    CMP BL, 0
+    JE PD_UNITS                     ; no tens digit for 0..9
+    MOV DL, BL
+    ADD DL, '0'
+    MOV AH, 02H                     ; DOS: print the character in DL
+    INT 21H
+PD_UNITS:
+    MOV DL, BH
+    ADD DL, '0'
+    MOV AH, 02H
+    INT 21H
+    POP DX
+    POP BX
+    POP AX
+    RET
+PRINT_DEC8 ENDP
+
 END MAIN
 </script>
 <script type="text/plain" id="src-output">
-Shift-and-Add Multiplication (no MUL)
-Multiplicand : 1234H (4660)
-Multiplier   : 5678H (22136)
-Step | Q0 | Action | Partial Product
- 1   | 0  | SKIP   | 00000000H
- 2   | 0  | SKIP   | 00000000H
- 3   | 0  | SKIP   | 00000000H
- 4   | 1  | ADD M  | 000091A0H
- 5   | 1  | ADD M  | 0001B4E0H
- 6   | 1  | ADD M  | 0003FB60H
- 7   | 1  | ADD M  | 00088860H
- 8   | 0  | SKIP   | 00088860H
- 9   | 0  | SKIP   | 00088860H
-10   | 1  | ADD M  | 002CF060H
-11   | 1  | ADD M  | 0075C060H
-12   | 0  | SKIP   | 0075C060H
-13   | 1  | ADD M  | 01990060H
-14   | 0  | SKIP   | 01990060H
-15   | 1  | ADD M  | 06260060H
-16   | 0  | SKIP   | 06260060H
-Product      : 06260060H (103153760)
+Count 1s and 0s in AX
+AX    : 1234H (0001001000110100b)
+Step | CF | Action
+ 1   | 0  | ZEROS++
+ 2   | 0  | ZEROS++
+ 3   | 1  | ONES++
+ 4   | 0  | ZEROS++
+ 5   | 1  | ONES++
+ 6   | 1  | ONES++
+ 7   | 0  | ZEROS++
+ 8   | 0  | ZEROS++
+ 9   | 0  | ZEROS++
+10   | 1  | ONES++
+11   | 0  | ZEROS++
+12   | 0  | ZEROS++
+13   | 1  | ONES++
+14   | 0  | ZEROS++
+15   | 0  | ZEROS++
+16   | 0  | ZEROS++
+Ones  : 5
+Zeros : 11
 </script>
 
 <script id="app">
@@ -1355,7 +1318,7 @@ Product      : 06260060H (103153760)
     });
   });
 
-  // ---------- theme (light by default; choice remembered per browser) ----------
+  // ---------- theme (light by default; the browser remembers the choice) ----------
   var root = document.documentElement;
   function setTheme(t) {
     if (t === 'dark') root.setAttribute('data-theme', 'dark'); else root.removeAttribute('data-theme');
@@ -1374,39 +1337,32 @@ Product      : 06260060H (103153760)
   });
 
   // ---------- helpers ----------
-  var SA = window.ShiftAdd;
+  var BC = window.BitCount;
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
-  // Pretty register names for display: Q0 -> Q₀.
-  function pretty(s) { return esc(s).replace(/Q0/g, 'Q₀'); }
-  function hexOf(v, bits) { return SA.toHex(v, bits / 4) + 'H'; }
+  function hex4(v) { return BC.toHex(v, 4) + 'H'; }
+  function nibbles(bits) { return bits.replace(/(.{4})(?=.)/g, '$1 '); }
 
-  // Bit boxes, grouped into nibbles and 16-bit words.
-  // opts: { mark: [indices to highlight], prev: string to diff against }
+  // 16 bit boxes grouped into nibbles.
+  // opts: { mark: index to highlight, slide: animate a right shift }
   function bitBoxes(bits, opts) {
     opts = opts || {};
-    var L = bits.length, h = '<span class="bits">';
-    for (var i = 0; i < L; i++) {
-      var left = L - i;   // bits from here to the right end, inclusive
-      if (i === 0) h += '<span class="word"><span class="nib">';
-      else if (left % 16 === 0) h += '</span></span><span class="word"><span class="nib">';
-      else if (left % 4 === 0) h += '</span><span class="nib">';
+    var h = '<span class="bits"><span class="word">';
+    for (var i = 0; i < bits.length; i++) {
+      if (i % 4 === 0) h += (i ? '</span>' : '') + '<span class="nib">';
       var c = 'bit';
-      if (opts.mark && opts.mark.indexOf(i) !== -1) c += ' pair';
-      if (opts.prev && opts.prev[i] !== bits[i]) c += ' changed';
+      if (opts.mark === i) c += ' pair';
+      if (opts.slide) c += i === 0 ? ' enter' : ' slide';
       h += '<span class="' + c + '">' + bits[i] + '</span>';
     }
     return h + '</span></span></span>';
   }
-  // Bit text for the table: nibbles separated by a space, leading zeros greyed,
-  // each 16-bit word kept together so long registers wrap cleanly on a phone.
+  // Bit text for the table: nibbles separated by a space, leading zeros greyed.
   function bitText(bits) {
     var lead = bits.indexOf('1');
     if (lead === -1) lead = bits.length - 1;
     var h = '<span class="tw">';
     for (var i = 0; i < bits.length; i++) {
-      var left = bits.length - i;
-      if (i && left % 16 === 0) h += '</span> <span class="tw">';
-      else if (i && left % 4 === 0) h += ' ';
+      if (i && i % 4 === 0) h += ' ';
       h += i < lead ? '<span class="x">' + bits[i] + '</span>' : bits[i];
     }
     return h + '</span>';
@@ -1414,58 +1370,28 @@ Product      : 06260060H (103153760)
 
   // ---------- state ----------
   var state = { run: null, cur: 0, timer: null };
-  var inM = $('in-m'), inQ = $('in-q');
-  var lastBase = 'dec';   // base the inputs are currently written in
+  var inV = $('in-v');
+  var lastBase = 'hex';   // base the input is currently written in
 
-  function width() { return +document.querySelector('input[name="n"]:checked').value; }
   function base() { return document.querySelector('input[name="base"]:checked').value; }
-
-  function setErr(input, errEl, msg) {
-    errEl.textContent = msg || '';
-    if (msg) input.setAttribute('aria-invalid', 'true'); else input.removeAttribute('aria-invalid');
-  }
 
   function load() {
     stopPlay();
-    var n = width(), b = base(), max = SA.range(n).max;
-    $('range-hint').textContent = 'Range for ' + n + ' bits: 0 to ' + max + ' (' + hexOf(0, n) + ' to ' + hexOf(max, n) + ')';
-    Array.prototype.forEach.call(document.querySelectorAll('.unit'), function (u) { u.textContent = b; });
-    $('sim-body').className = 'w' + n;
-    var pm = SA.parseNumber(inM.value, b), pq = SA.parseNumber(inQ.value, b);
-    var v = SA.validate(pm.err ? NaN : pm.v, pq.err ? NaN : pq.v, n);
-    setErr(inM, $('err-m'), pm.err || v.errors.m);
-    setErr(inQ, $('err-q'), pq.err || v.errors.q);
-    var ok = !pm.err && !pq.err && v.ok;
-    $('sim-body').classList.toggle('invalid', !ok);
-    $('invalid-msg').hidden = ok;
-    if (!ok) { state.run = null; updateControls(); return; }
-    state.run = SA.multiply(pm.v, pq.v, n);
+    var b = base();
+    document.querySelector('.unit').textContent = b;
+    var p = BC.parseNumber(inV.value, b);
+    var v = BC.validate(p.err ? NaN : p.v);
+    var msg = p.err || v.error;
+    $('err-v').textContent = msg || '';
+    if (msg) inV.setAttribute('aria-invalid', 'true'); else inV.removeAttribute('aria-invalid');
+    $('sim-body').classList.toggle('invalid', !!msg);
+    $('invalid-msg').hidden = !msg;
+    if (msg) { state.run = null; updateControls(); return; }
+    state.run = BC.count(p.v);
     state.cur = 0;
-    renderSetup();
-    renderVsLive();
+    renderOtherLive();
     buildTable();
-    render();
-  }
-
-  // ---------- binary setup ----------
-  function renderSetup() {
-    var R = state.run, n = R.n, w = R.width, max = SA.range(n).max, big = max * max;
-    var h = '';
-    h += '<span class="k">M</span>' + bitBoxes(R.Mbits) +
-         '<span class="note">multiplicand = ' + R.m + ' = <span class="mono">' + hexOf(R.m, n) + '</span> (' + n + ' bits)</span>';
-    h += '<span class="k">Q</span>' + bitBoxes(R.Qbits) +
-         '<span class="note">multiplier = ' + R.q + ' = <span class="mono">' + hexOf(R.q, n) + '</span> (' + n + ' bits)</span>';
-    h += '<span class="k">P</span>' + bitBoxes(R.rows[0].P) +
-         '<span class="note">product register, starts at 0, <b>2n = ' + w + ' bits</b> wide. ' +
-         'M is also held in ' + w + ' bits so it can shift left. Count = n = ' + n + '.</span>';
-    $('setup').innerHTML = h;
-    $('fit-note').innerHTML = '<strong>No overflow is possible.</strong> The largest ' + n + '-bit &times; ' + n +
-      '-bit product is (2<sup>' + n + '</sup> &minus; 1)<sup>2</sup> = ' + max + ' &times; ' + max + ' = ' + big +
-      ' = <span class="mono">' + hexOf(big, w) + '</span>, which is less than 2<sup>' + w + '</sup> = ' + Math.pow(2, w) +
-      '. So the ' + w + '-bit P always holds the whole product, and M never loses a bit off the top when it is shifted left ' + n + ' times.';
-    $('th-m').innerHTML = 'M <small>(' + w + '-bit)</small>';
-    $('th-q').innerHTML = 'Q <small>(' + n + '-bit)</small>';
-    $('th-p').innerHTML = 'P <small>(' + w + '-bit)</small>';
+    render(false);
   }
 
   // ---------- table ----------
@@ -1478,13 +1404,11 @@ Product      : 06260060H (103153760)
       tr.className = 'k-' + row.kind;
       tr.innerHTML =
         '<td class="step">' + esc(row.label) + '</td>' +
-        '<td class="b">' + row.q0 + '</td>' +
-        '<td class="op"><span class="opname">' + (row.kind === 'shift'
-          ? '<span class="long">Shift M left, Q right</span><abbr class="short" title="Shift M left, Q right">Shift</abbr>'
-          : esc(row.action)) + '</span></td>' +
-        '<td class="b" title="M = ' + row.mVal + '">' + bitText(row.M) + '</td>' +
-        '<td class="b" title="Q = ' + row.qVal + '">' + bitText(row.Q) + '</td>' +
-        '<td class="b" title="P = ' + row.pVal + '">' + bitText(row.P) + '</td>' +
+        '<td class="b" title="AX = ' + hex4(row.axVal) + '">' + bitText(row.ax) + '</td>' +
+        '<td class="b">' + (row.cf === '' ? '<span class="x">&ndash;</span>' : row.cf) + '</td>' +
+        '<td class="op"><span class="opname">' + esc(row.action) + '</span></td>' +
+        '<td class="b">' + row.ones + '</td>' +
+        '<td class="b">' + row.zeros + '</td>' +
         '<td class="b">' + row.count + '</td>';
       tr.addEventListener('click', function () { stopPlay(); go(i); });
       body.appendChild(tr);
@@ -1493,121 +1417,86 @@ Product      : 06260060H (103153760)
   }
 
   // ---------- render current step ----------
-  var BADGE = { init: 'Initial', add: 'Add M', skip: 'No add', shift: 'Shift' };
-  function reg(name, desc, bits, value, bitsW, opts, cls) {
-    return '<div class="reg ' + (cls || '') + '"><div class="lbl"><b>' + name + '</b><small>' + desc + '</small>' +
-      '<span class="val">= ' + value + ' &middot; ' + hexOf(value, bitsW) + '</span></div>' +
-      '<div class="rbits">' + bitBoxes(bits, opts) + '</div></div>';
-  }
-  function render() {
+  // anim is true only when moving forward by exactly one step: the bits slide
+  // right, the outgoing bit drops into CF and the matching counter ticks.
+  function render(anim) {
     var R = state.run;
     if (!R) return;
-    var i = state.cur, row = R.rows[i], prev = i > 0 ? R.rows[i - 1] : null, n = R.n, w = R.width;
-    var last = R.rows.length - 1;
+    var i = state.cur, row = R.rows[i], last = R.rows.length - 1, done = i === last;
+    var cfCls = row.cf === '' ? 'none' : row.cf === '1' ? 'one' : 'zero';
     $('regs').innerHTML =
-      reg('M', 'multiplicand, shifted', row.M, row.mVal, w, { prev: prev && prev.M },
-        row.kind === 'add' ? 'adding' : row.kind === 'skip' ? 'skipping' : '') +
-      reg('Q', 'multiplier · Q₀ →', row.Q, row.qVal, n, { mark: [n - 1], prev: prev && prev.Q }) +
-      reg('P', 'product', row.P, row.pVal, w, { prev: prev && prev.P }) +
-      '<div class="reg count"><div class="lbl"><b>Count</b><small>cycles left</small></div><div class="rbits">' + row.count + '</div></div>';
+      '<div class="reg"><div class="lbl"><b>AX</b><small>' + (done ? 'all 16 bits shifted out' : 'shifted right &middot; bit 0 goes to CF') + '</small>' +
+        '<span class="val">= ' + hex4(row.axVal) + ' &middot; ' + row.axVal + '</span></div>' +
+        '<div class="rbits axrow">' + bitBoxes(row.ax, { mark: done ? -1 : 15, slide: anim }) +
+        '<span class="arrow" aria-hidden="true">&rarr;</span>' +
+        '<span class="cfwrap"><small>CF</small><span class="bit cf ' + cfCls + (anim ? ' drop' : '') + '">' +
+        (row.cf === '' ? '&ndash;' : row.cf) + '</span></span></div></div>' +
+      '<div class="reg"><div class="lbl"><b>Saved AX</b><small>copy on the stack (PUSH AX)</small></div>' +
+        '<div class="rbits savedax"><span>' + hex4(R.saved) + '</span><small>' + nibbles(R.bits) +
+        (done ? ' &middot; POP AX puts it back' : ' &middot; untouched by the shifts') + '</small></div></div>';
+
+    $('counters').innerHTML =
+      '<div class="ctr ones' + (anim && row.kind === 'one' ? ' tick' : '') + '"><small>ONES</small><b>' + row.ones + '</b><span>1 bits counted</span></div>' +
+      '<div class="ctr zeros' + (anim && row.kind === 'zero' ? ' tick' : '') + '"><small>ZEROS</small><b>' + row.zeros + '</b><span>0 bits counted</span></div>' +
+      '<div class="ctr cnt"><small>Count</small><b>' + row.count + '</b><span>bits left</span></div>';
+    $('inv').innerHTML = '<b>Invariant:</b> ONES + ZEROS = ' + row.ones + ' + ' + row.zeros + ' = <b>' + (row.ones + row.zeros) + '</b>' +
+      (done ? ' &check; (all 16 bits counted)' : ' = bits examined so far (16 &minus; Count = ' + (16 - row.count) + '). It reaches 16 when Count = 0.');
 
     var opline = $('op-badge').parentNode;
     opline.className = 'opline k-' + row.kind;
-    $('op-badge').textContent = BADGE[row.kind];
-    $('why').innerHTML = pretty(row.why);
-    $('stepinfo').textContent = 'Step ' + i + ' of ' + last + (i === 0 ? '' : '  ·  cycle ' + row.cycle + ' of ' + n);
+    $('op-badge').textContent = row.kind === 'init' ? 'Initial' : row.action;
+    $('why').textContent = row.why;
+    $('stepinfo').textContent = 'Step ' + i + ' of ' + last;
 
     rowEls.forEach(function (tr, k) {
       tr.hidden = k > i;
       tr.classList.toggle('current', k === i);
     });
-    renderLong();
-    renderResult(i === last);
+    renderResult(done);
     updateControls();
   }
 
   function renderResult(done) {
     var R = state.run, el = $('result');
     if (!done) {
-      el.innerHTML = '<p class="muted">The product appears when Count reaches 0 (step ' + (R.rows.length - 1) + ').</p>';
+      el.innerHTML = '<p class="muted">The counts appear when Count reaches 0 (step 16).</p>';
       return;
     }
-    var p = R.product, n = R.n, w = R.width;
-    // Independent check, computed outside the core with BigInt multiplication.
-    var expect = BigInt(R.m) * BigInt(R.q);
-    var ok = BigInt(p.value) === expect;
-    var grouped = p.bits.replace(/(.{4})(?=.)/g, '$1 ');
+    // Independent check, computed outside the core: write the value in binary
+    // with toString(2) and count the characters.
+    var bin = R.value.toString(2), ones = 0;
+    for (var k = 0; k < bin.length; k++) if (bin.charAt(k) === '1') ones++;
+    var zeros = 16 - ones;
+    var sumOk = R.ones + R.zeros === 16;
+    var indOk = R.ones === ones && R.zeros === zeros;
     el.innerHTML =
-      '<p class="muted">Product P (' + w + ' bits, unsigned)</p>' +
-      '<div class="result-bits">' + grouped + '</div>' +
-      '<p class="result-dec">= ' + p.hex + 'H <span class="muted">=</span> ' + p.value + '<sub style="font-size:.5em">10</sub></p>' +
-      '<p class="check ' + (ok ? 'ok' : 'bad') + '">Product = ' + p.value + ' = ' + R.m + ' × ' + R.q +
-        (ok ? '  ✓' : '  ✗ (expected ' + expect + ')') +
-        '<small>' + p.hex + 'H = ' + hexOf(R.m, n) + ' × ' + hexOf(R.q, n) + ' (checked with BigInt, outside the algorithm)</small></p>';
+      '<p class="muted">AX = ' + hex4(R.value) + ' = <span class="mono">' + nibbles(R.bits) + '</span> = ' + R.value + '<sub style="font-size:.7em">10</sub></p>' +
+      '<div class="resnums"><div class="ctr ones"><small>ONES</small><b>' + R.ones + '</b><span>set bits (1s)</span></div>' +
+      '<div class="ctr zeros"><small>ZEROS</small><b>' + R.zeros + '</b><span>cleared bits (0s)</span></div></div>' +
+      '<p class="check ' + (sumOk ? 'ok' : 'bad') + '">ONES + ZEROS = ' + R.ones + ' + ' + R.zeros + ' = ' + (R.ones + R.zeros) +
+        (sumOk ? '  ✓' : '  ✗ (expected 16)') + '</p><br>' +
+      '<p class="check ' + (indOk ? 'ok' : 'bad') + '">Independent check: ' + ones + ' ones, ' + zeros + ' zeros' +
+        (indOk ? '  ✓' : '  ✗ (the algorithm gave ' + R.ones + ' and ' + R.zeros + ')') +
+        '<small>counted from value.toString(2) = "' + bin + '", outside the algorithm</small></p>' +
+      '<p class="muted">AX itself is 0000H after the 16 shifts; <span class="mono">POP AX</span> restores the saved ' + hex4(R.saved) + '.</p>';
   }
 
-  // Live comparison on the "Shift-add vs Booth's" tab for the multiplier currently loaded.
-  function renderVsLive() {
-    var R = state.run, q = R.Qbits, ones = 0, booth = 0;
-    for (var i = 0; i < q.length; i++) if (q[i] === '1') ones++;
-    // Booth on the same unsigned pattern: one add/sub at every 0/1 boundary of 0 Q 0
-    // (a 0 above the top bit for the unsigned value, and Q-1 = 0 below bit 0).
-    var padded = '0' + q + '0';
-    for (var k = 0; k + 1 < padded.length; k++) if (padded[k] !== padded[k + 1]) booth++;
-    $('vs-live').innerHTML = '<b>Your current multiplier</b> Q = <span class="mono">' + q + '</span> (' + R.q + '): ' +
-      'shift-and-add adds M <b>' + ones + '</b> time' + (ones === 1 ? '' : 's') + ' (once per 1 bit); ' +
-      'Booth would need <b>' + booth + '</b> add/subtract operation' + (booth === 1 ? '' : 's') + ' (once per start or end of a run of 1s).';
-  }
-
-  // ---------- long multiplication view ----------
-  // Columns are bit positions 2n-1 .. 0 (left to right). Row b is M shifted left
-  // b places (or zeros when bit b of the original Q is 0), revealed in step with
-  // the trace.
-  function renderLong() {
-    var R = state.run, n = R.n, w = R.width, i = state.cur, row = R.rows[i];
-    var done = 0;                                    // cycles whose add/no-add row is reached
-    for (var k = 1; k <= i; k++) if (R.rows[k].kind === 'add' || R.rows[k].kind === 'skip') done++;
-    var curCycle = row.kind === 'add' || row.kind === 'skip' ? row.cycle : 0;
-    var qBit = curCycle ? curCycle - 1 : -1;       // original Q bit being used right now
-
-    function cells(bitsFor, extra) {               // bitsFor(pos) -> bit char, '' (blank) or '·'
-      var h = '';
-      for (var c = 0; c < w; c++) {
-        var pos = w - 1 - c, ch = bitsFor(pos), x = extra ? extra(pos) : '';
-        var cls = 'bitc' + (pos % 4 === 3 && c > 0 ? ' gap' : '') + (ch === '·' ? ' dot' : '') + (x ? ' ' + x : '');
-        h += '<td class="' + cls + '">' + ch + '</td>';
-      }
-      return h;
-    }
-    var h = '';
-    h += '<tr><td class="op"></td>' + cells(function (p) { return p < n ? R.Mbits[n - 1 - p] : ''; }) +
-         '<td class="note">M = ' + R.m + '</td></tr>';
-    h += '<tr><td class="op">×</td>' + cells(function (p) { return p < n ? R.Qbits[n - 1 - p] : ''; },
-           function (p) { return p === qBit ? 'qb' : ''; }) +
-         '<td class="note">Q = ' + R.q + (qBit >= 0 ? ' &middot; using bit ' + qBit : '') + '</td></tr>';
-    for (var b = 0; b < n; b++) {
-      var one = R.Qbits[n - 1 - b] === '1';
-      var cls = (b === 0 ? 'rule ' : '') + (one ? 'addr' : 'zero') + (b >= done ? ' pend' : '') + (b === qBit ? ' cur' : '');
-      h += '<tr class="' + cls + '"><td class="op">' + (b ? '+' : '') + '</td>' +
-        cells(function (p) {
-          if (p < b) return '·';
-          if (p > b + n - 1) return '';
-          return one ? R.Mbits[n - 1 - (p - b)] : '0';
-        }) +
-        '<td class="note">bit ' + b + ' = ' + (one ? '1 → M × 2<sup>' + b + '</sup> = ' + (R.m * Math.pow(2, b)) : '0 → 0') + '</td></tr>';
-    }
-    var last = i === R.rows.length - 1;
-    h += '<tr class="rule sum' + (last ? ' done' : '') + '"><td class="op">=</td>' +
-      cells(function (p) { return row.P[w - 1 - p]; }) +
-      '<td class="note">' + (last ? 'P = ' + row.pVal + ' = product ✓' : 'P = ' + row.pVal + ' (sum of the rows so far)') + '</td></tr>';
-    $('lm').innerHTML = h;
+  // Live comparison on the "Other methods" tab for the value currently loaded.
+  function renderOtherLive() {
+    var R = state.run, x = R.value, trail = [], n = 0;
+    while (x !== 0) { x = x & (x - 1); n++; if (trail.length < 17) trail.push(hex4(x)); }
+    $('other-live').innerHTML = '<b>Your current value</b> AX = <span class="mono">' + hex4(R.value) + '</span>: ' +
+      'shift-and-count always loops <b>16</b> times; Kernighan\'s loop would run <b>' + n + '</b> time' + (n === 1 ? '' : 's') +
+      (n ? ' (<span class="mono">' + hex4(R.value) + ' &rarr; ' + trail.join(' &rarr; ') + '</span>)' : '') +
+      ', giving ONES = ' + n + ' and ZEROS = 16 &minus; ' + n + ' = ' + (16 - n) + '.';
   }
 
   // ---------- navigation ----------
   function go(i) {
     if (!state.run) return;
+    var before = state.cur;
     state.cur = Math.max(0, Math.min(state.run.rows.length - 1, i));
-    render();
+    render(state.cur === before + 1);
   }
   var PLAY_MS = 1200;
   function playing() { return state.timer !== null; }
@@ -1660,44 +1549,35 @@ Product      : 06260060H (103153760)
     e.preventDefault();
   });
 
-  // Presets (they also set the number base and bit width)
+  // Presets are written in hex, so they also switch the number base to hex.
   Array.prototype.forEach.call(document.querySelectorAll('#presets button'), function (b) {
     b.addEventListener('click', function () {
-      inM.value = b.getAttribute('data-m');
-      inQ.value = b.getAttribute('data-q');
-      document.querySelector('input[name="base"][value="' + b.getAttribute('data-base') + '"]').checked = true;
-      lastBase = base();
-      document.querySelector('input[name="n"][value="' + b.getAttribute('data-n') + '"]').checked = true;
+      inV.value = b.getAttribute('data-v');
+      document.querySelector('input[name="base"][value="hex"]').checked = true;
+      lastBase = 'hex';
       load();
     });
   });
 
-  // ---------- inputs ----------
-  [inM, inQ].forEach(function (el) {
-    el.addEventListener('input', load);
-    el.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); load(); } });
-  });
-  // Switching base rewrites valid values in the new base, so 13 becomes D and back.
+  // ---------- input ----------
+  inV.addEventListener('input', load);
+  inV.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); load(); } });
+  // Switching base rewrites a valid value in the new base, so 1234 (hex) becomes 4660 and back.
   Array.prototype.forEach.call(document.querySelectorAll('input[name="base"]'), function (r) {
     r.addEventListener('change', function () {
       var nb = base();
-      [inM, inQ].forEach(function (el) {
-        var p = SA.parseNumber(el.value, lastBase);
-        if (!p.err && p.v >= 0) el.value = nb === 'hex' ? p.v.toString(16).toUpperCase() : String(p.v);
-      });
+      var p = BC.parseNumber(inV.value, lastBase);
+      if (!p.err && p.v >= 0) inV.value = nb === 'hex' ? BC.toHex(p.v, 4) : String(p.v);
       lastBase = nb;
       load();
     });
-  });
-  Array.prototype.forEach.call(document.querySelectorAll('input[name="n"]'), function (r) {
-    r.addEventListener('change', load);
   });
   $('inputs').addEventListener('submit', function (e) { e.preventDefault(); load(); });
 
   // ---------- 8086 assembly tab ----------
   function srcText(id) { return $(id).textContent.replace(/^\n/, ''); }
   function setOf(words) { var o = {}; words.split(' ').forEach(function (w) { o[w] = 1; }); return o; }
-  var INS = setOf('mov movzx xor add adc sub shl shr rcl rol test cmp jz jnz jae jbe jmp call ret dec inc neg and or int div push pop lea loop');
+  var INS = setOf('mov movzx xor add adc sub shl shr rcl rol test cmp jz jnz jc jnc je jne jae jbe jmp call ret dec inc neg and or int div push pop lea loop');
   var REG = setOf('ax bx cx dx si di al ah bl bh cl ch dl dh eax ebx ecx edx esi edi ds es ss cs sp bp');
   var DIR = setOf('section global db dw dd resb resw resd equ .model .stack .data .code proc endp end small byte word dword @data');
   // Small syntax highlighter for NASM/MASM: comments, strings, numbers, labels,

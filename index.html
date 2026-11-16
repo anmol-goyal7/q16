@@ -607,6 +607,34 @@
         </table>
         </div>
       </div>
+
+      <div class="card prose" id="time-card">
+        <h2>Execution time</h2>
+        <p>Clock cycles for the bit-counting part of the program (<span class="mono">MOV AX,NUM</span> to <span class="mono">MOV ZEROS,BH</span>), from Intel's published 8086 instruction timings. The printing (<span class="mono">INT 21H</span>) runs DOS code and is not counted.</p>
+        <div class="tablewrap">
+        <table class="mini">
+          <thead><tr><th>Instructions</th><th>Cycles</th><th>Runs</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">MOV AX,NUM</td><td>10</td><td>once</td></tr>
+            <tr><td class="mono">PUSH AX</td><td>11</td><td>once</td></tr>
+            <tr><td class="mono">XOR BL,BL + XOR BH,BH</td><td>3 + 3</td><td>once</td></tr>
+            <tr><td class="mono">MOV CX,16</td><td>4</td><td>once</td></tr>
+            <tr><td><span class="add-c">Bit = 1:</span> <span class="mono">SHR</span> 2 + <span class="mono">JNC</span> not taken 4 + <span class="mono">INC BL</span> 3 + <span class="mono">JMP</span> 15</td><td><b>24</b></td><td>once per 1 bit</td></tr>
+            <tr><td><span class="zero-c">Bit = 0:</span> <span class="mono">SHR</span> 2 + <span class="mono">JNC</span> taken 16 + <span class="mono">INC BH</span> 3</td><td><b>21</b></td><td>once per 0 bit</td></tr>
+            <tr><td class="mono">LOOP next_bit</td><td>17 (jumps) / 5 (falls through)</td><td>15 + 1 = 260</td></tr>
+            <tr><td class="mono">POP AX</td><td>8</td><td>once</td></tr>
+            <tr><td class="mono">MOV ONES,BL + MOV ZEROS,BH</td><td>15 + 15</td><td>once</td></tr>
+          </tbody>
+        </table>
+        </div>
+        <p><b>Total = 329 + 24 &times; ONES + 21 &times; ZEROS cycles.</b> The loop always runs 16 times. A 1 bit costs 3 cycles more than a 0 bit, because it takes the extra <span class="mono">JMP counted</span> while a 0 bit takes the <span class="mono">JNC</span> jump.</p>
+        <ul>
+          <li><b>1234H</b> (default, 5 ones): 329 + 120 + 231 = <b>680 cycles</b>, about <b>136 &micro;s</b> on a 5 MHz 8086.</li>
+          <li><b>Fastest</b>, 0000H: 665 cycles (133 &micro;s). <b>Slowest</b>, FFFFH: 713 cycles (142.6 &micro;s).</li>
+        </ul>
+        <p class="live" id="time-live"></p>
+        <p class="muted">These are textbook figures: they ignore prefetch-queue and memory wait-state effects. On a modern PC, <span class="mono">count16.asm</span> takes about 0.2 ms per run (measured over 200 runs), and almost all of that is Linux starting the process and printing. The 16-step loop itself takes a few nanoseconds.</p>
+      </div>
     </section>
 
     <section id="panel-other" role="tabpanel" aria-labelledby="tab-other" hidden>
@@ -1390,6 +1418,7 @@ Zeros : 11
     state.run = BC.count(p.v);
     state.cur = 0;
     renderOtherLive();
+    renderTimeLive();
     buildTable();
     render(false);
   }
@@ -1489,6 +1518,14 @@ Zeros : 11
       'shift-and-count always loops <b>16</b> times; Kernighan\'s loop would run <b>' + n + '</b> time' + (n === 1 ? '' : 's') +
       (n ? ' (<span class="mono">' + hex4(R.value) + ' &rarr; ' + trail.join(' &rarr; ') + '</span>)' : '') +
       ', giving ONES = ' + n + ' and ZEROS = 16 &minus; ' + n + ' = ' + (16 - n) + '.';
+  }
+
+  // Live 8086 cycle count on the "8086 Assembly" tab for the value currently loaded.
+  function renderTimeLive() {
+    var R = state.run, cycles = 329 + 24 * R.ones + 21 * R.zeros;
+    $('time-live').innerHTML = '<b>Your current value</b> AX = <span class="mono">' + hex4(R.value) + '</span> (' +
+      R.ones + ' ones, ' + R.zeros + ' zeros): 329 + 24 &times; ' + R.ones + ' + 21 &times; ' + R.zeros +
+      ' = <b>' + cycles + ' cycles</b>, about <b>' + (cycles / 5).toFixed(1) + ' &micro;s</b> at 5 MHz.';
   }
 
   // ---------- navigation ----------

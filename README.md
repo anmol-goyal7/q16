@@ -18,7 +18,7 @@ The textbook **shift-and-count** method: AX = value, ONES = 0, ZEROS = 0, Count 
 - Next / Previous / Play-Pause (1.2 s) / Run all / Reset, plus keyboard shortcuts (← → Space Home End).
 - Result panel with ONES, ZEROS, the check `ONES + ZEROS = 16 ✓`, and an independent check computed outside the algorithm (counting the `1` characters of `value.toString(2)`).
 - Presets: 0000H (all zeros), FFFFH (all ones), AAAAH (alternating), 8001H (edges only), 00FFH and 1234H (the assembly default).
-- "How it works" tab with an SVG flowchart, an "8086 Assembly" tab (highlighted source, copy button, OneCompiler link, real program output, instruction-to-step table) and an "Other methods" tab (ROL, TEST with a mask, Kernighan's `x & (x − 1)`, and why shift-and-count is the textbook one).
+- "How it works" tab with an SVG flowchart, an "8086 Assembly" tab (highlighted source, copy button, OneCompiler link, real program output, instruction-to-step table, execution time in 8086 clock cycles with a live count for the loaded value) and an "Other methods" tab (ROL, TEST with a mask, Kernighan's `x & (x − 1)`, and why shift-and-count is the textbook one).
 - Responsive, light theme by default with a dark mode toggle.
 - **Single file, fully offline:** no CDNs, no web fonts, all CSS/JS inline.
 
@@ -99,6 +99,29 @@ Zeros : 11
 > **Note:** `count16_8086.asm` has **not been run** on emu8086 or DOSBox, because no MASM/TASM toolchain or DOS emulator was available on the development machine. It was checked carefully by eye, and `test_asm.sh` verifies automatically that its algorithm block (`MOV AX, NUM` … `POP AX`) is instruction-for-instruction identical to `count16.asm`'s, which is run and tested on 50 values. The untested parts are the two short print routines: `PRINT_HEX16` (`ROL BX,CL` by 4, then `INT 21H AH=02H`) and `PRINT_DEC8` (`DIV BL` by 10, then `INT 21H AH=02H`). Try it once in emu8086 before the demo.
 
 > **Note on `LOOP` in `count16.asm`:** on a real 8086 `LOOP` counts with CX. OneCompiler assembles the NASM file as 32-bit code, where the same instruction counts with ECX, so the print helpers end with `movzx ecx, cx` to keep ECX equal to CX. The algorithm block itself is unchanged 8086 code.
+
+## Execution time
+
+Clock cycles for the bit-counting part of the program (`MOV AX,NUM` to `MOV ZEROS,BH`), from Intel's 8086 instruction timings. The printing (`INT 21H`) runs DOS code and is not counted.
+
+| Instructions | Cycles | Runs |
+|---|---|---|
+| `MOV AX,NUM` | 10 | once |
+| `PUSH AX` | 11 | once |
+| `XOR BL,BL` + `XOR BH,BH` | 3 + 3 | once |
+| `MOV CX,16` | 4 | once |
+| Bit = 1: `SHR` 2 + `JNC` not taken 4 + `INC BL` 3 + `JMP` 15 | **24** | once per 1 bit |
+| Bit = 0: `SHR` 2 + `JNC` taken 16 + `INC BH` 3 | **21** | once per 0 bit |
+| `LOOP next_bit` | 17 when it jumps, 5 when it falls through | 15 × 17 + 5 = 260 |
+| `POP AX` | 8 | once |
+| `MOV ONES,BL` + `MOV ZEROS,BH` | 15 + 15 | once |
+
+**Total = 329 + 24 × ONES + 21 × ZEROS cycles.**
+
+- **1234H** (5 ones, 11 zeros): **680 cycles**, about **136 µs** on a 5 MHz 8086.
+- **Fastest**, 0000H: 665 cycles (133 µs). **Slowest**, FFFFH: 713 cycles (142.6 µs).
+
+The loop always runs 16 times. A 1 bit costs 3 cycles more than a 0 bit, because it takes the extra `JMP COUNTED` while a 0 bit takes the `JNC` jump. These are textbook figures and ignore prefetch-queue and memory wait-state effects. On a modern PC, `count16.asm` takes about 0.2 ms per run (measured over 200 runs), and almost all of that is Linux starting the process and printing.
 
 ## Documentation
 
